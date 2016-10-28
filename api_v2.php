@@ -1,10 +1,8 @@
 <?php
 /****api类****/
 class api_v2{
-	const api_url="http://wop-api3.chease.cn/router/rest";
-	const secret="565975d7d7d01462245984408739804d";
+	const api_url="http://wop-api.chease.cn/router/rest";
 	protected $params=array(
-		"app_key"=>"96a3e23a32d4b81894061fdd29e94319",
 	 	"v"=>"2.0",
 	 	"format"=>"json",
 	 	"sign_method"=>"md5"
@@ -21,15 +19,18 @@ class api_v2{
 		return $url; 
 	}
 
-	function makeUrl($p){
+	function makeUrl($p,$opt){
 		$d=$this->params;
 		foreach ($d as $key => $value) {
 			$p[$key]=$value;
 		}
+		foreach ($opt as $key => $value) {
+			$p[$key]=$value;
+		}
+
 		if($p['method']=='wicare.cache.getObj'){
 			unset($p['app_key']);
 		}
-
 		$p["timestamp"]=date('Y-m-d H:i:s',strtotime('+8 hour'));
 		ksort($p);
 		$str="";
@@ -41,7 +42,7 @@ class api_v2{
 			$url.=$x."=".$val."&";
 		}
 		if($p['method']!='wicare.cache.getObj'){
-			$str=api_v2::secret.$str.api_v2::secret;
+			$str=$opt['app_secret'].$str.$opt['app_secret'];
 		}
 		$sign=strtoupper(md5($str));
 		$url.="sign=".$sign;
@@ -81,8 +82,15 @@ class api_v2{
 		return $response;
 	}
 
-	function start($data){
-		$url=$this->makeUrl($data);
+	function start($data,$opt=0){
+		if($opt==0){
+			$opt=array(
+				'access_token'=>'565975d7d7d01462245984408739804d',
+				'app_key'=>'96a3e23a32d4b81894061fdd29e94319',
+				'app_secret'=>'565975d7d7d01462245984408739804d'
+			);
+		}
+		$url=$this->makeUrl($data,$opt);
 		$res=$this->sendHttp($url);
 		return json_decode(characet($res),true);
 	}

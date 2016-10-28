@@ -9,16 +9,35 @@ include 'api_v2.php';
 if(isset($_GET['code'])){
 
     //根据域名获取公众号信息
-    $host=$_SERVER['HTTP_HOST'];//当前域名
+    $_host=$host=$_SERVER['HTTP_HOST'];//当前域名
+    if($host=='user.autogps.cn')
+        $_host='wx.autogps.cn';
     $API=new api_v2();//api接口类
-    //用于获取app数据
-    $appData=array(
-        'domainName' => $host,
-        'method'=>'wicare.app.get',
-        'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
-    );
-    //获取app数据
-    $appRes=$API->start($appData);
+    if(isset($_GET['wx_app_id'])){
+        $custData=array(
+            'wxAppKey' => $_GET['wx_app_id'],
+            'method'=>'wicare.customer.get',
+            'fields'=>'wxAppKey,wxAppSecret'
+        );
+        $opt=array(
+            'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
+            'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
+            'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
+            'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
+        );
+        $appRes=$API->start($custData,$opt);
+        // print_r($appRes);
+    }else{
+        //用于获取app数据
+        $appData=array(
+            'domainName' => $_host,
+            'method'=>'wicare.app.get',
+            'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
+        );
+        //获取app数据
+        $appRes=$API->start($appData);
+    }
+    
     if(!$appRes||!$appRes['data']){
         echo 'Not configured domainName';
         exit;
@@ -102,11 +121,13 @@ $u_data="";
 foreach($userinfo as $x=>$x_value) {
   $u_data=$u_data."&".$x."=".$x_value;
 }
+// print_r($userinfo);
 if(strpbrk($cookie_url,"?"))
     $url=$cookie_url.$u_data;
 else{
     $url=$cookie_url."?".substr($u_data,1);
 }
+// echo $url;
 header("Location: ".$url);
 exit;
 ?>
