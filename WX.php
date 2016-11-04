@@ -61,11 +61,12 @@ class WX{
 	}
 
 	function sendWeixin($open_id,$template_id,$data,$link){
-		$acess = $this->getToken()['access_token'];
+		$res=$this->getToken();
+		$acess = $res['access_token'];
 		$url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=' . $acess;
 		$data = '{"touser":"' . $open_id . '","template_id":"'. $template_id .'","url":"'. $link .'",' .
 		    '"data": '. $data . '}';
-		return httpPost($url, $data);
+		return $this->httpPost($url, $data);
 	}
 
 

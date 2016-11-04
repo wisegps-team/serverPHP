@@ -10,12 +10,13 @@ if(!isset($_GET["method"]))
 //根据method进行操作
 switch ($_GET["method"]){
 	case "createaccountbindimei":
+		echo $a->register();
 		break;
 	case "login":
 		echo $a->login();
 		break;
 	case "updatepassword":
-		echo $a->register();
+		echo $a->resetPassword();
 		break;
 	case "devicebind":
 		echo $a->deviceBind();
@@ -222,44 +223,64 @@ class papiApi{
 //收到回调，推送给用户
 function postData(){
 	//根据imei查到车辆，根据车辆查到客户表，客户表查到用户，获取用户openid，给他推送
-	$_POST['fileType'];
-	$_POST['fileUrl'];
-	$_POST['imei'];
-	$_POST['tag'];
+	// $_POST['fileType'];
+	// $_POST['fileUrl'];
+	// $_POST['imei'];
+	// $_POST['tag'];
+	$imei=$_GET['imei'];
+	$url=$_GET['fileUrl'];
+	$type='报警类型';
+	$des='报警描述';
+	$title='标题';
+	$remark='备注';
+	$opt=array(
+		'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
+		'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
+		'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
+		'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
+	);
 	$API=new api_v2();//api接口类
 	//用于获取车辆数据
 	$vehicle=$API->start(array(
 		'method'=>'wicare.vehicle.get',
-		'did'=>$_POST['imei'],
-		'fields'=>'uid'
-	));
+		'did'=>$imei,
+		'fields'=>'uid,name'
+	),$opt);
+	echo '<br>vehicle=';
+	print_r($vehicle);
 	if($vehicle['status_code']||!$vehicle['data'])return;
 	$cust=$API->start(array(
 		'method'=>'wicare.customer.get',
 		'objectId'=>$vehicle['data']['uid'],
 		'fields'=>'uid,parentId'
-	));
+	),$opt);
+
+	echo '<br>cust=';
+	print_r($cust);
 	if($cust['status_code']||!$cust['data'])return;
 	$user=$API->start(array(
 		'method'=>'wicare.user.get',
 		'objectId'=>$cust['data']['uid'],
 		'fields'=>'authData'
-	));
+	),$opt);
+	echo '<br>user=';
+	print_r($user);
 	if($user['status_code']||!$user['data']||!$user['data']['authData']['openId'])return;
 	$openId=$user['data']['authData']['openId'];
 
 	$parentCust=$API->start(array(//获取微信key
 		'method'=>'wicare.customer.get',
-		'objectId'=>$cust['parentId'][0],
+		'objectId'=>$cust['data']['parentId'][0],
 		'fields'=>'wxAppKey,wxAppSecret'
-	));
+	),$opt);
+	print_r($parentCust);
 	if($parentCust['status_code']||!$parentCust['data'])return;
 
 	$wx=new WX($parentCust['data']['wxAppKey'],$parentCust['data']['wxAppSecret']);
 
 	$tid='Ua937cQPpSvrj40HlULlYa_NSNt0G_uEuvXiXacktEg';
-	$data='{"first":{"value":"这是内容","color":"#173177"},"keynote1":{"value":"发送者","color":"#173177"},"keynote2":{"value":"时间","color":"#173177"},"remark":{"value":"备注","color":"#173177"}}';
-	$wx->sendWeixin($openId,$tid,$data,$_POST['fileUrl']);
+	$data='{"first":{"value":"'.$title.'","color":"#173177"},"keyword1":{"value":"'.$vehicle['data']['name'].'","color":"#173177"},"keyword2":{"value":"'.date('Y-m-d H:i:s',strtotime('+8 hour')).'","color":"#173177"},"keyword3":{"value":"'.$type.'","color":"#173177"},"keyword4":{"value":"'.$des.'","color":"#173177"},"remark":{"value":"'.$remark.'","color":"#173177"}}';
+	echo $wx->sendWeixin($openId,$tid,$data,$url);
 }
 
 

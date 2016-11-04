@@ -85,7 +85,7 @@ class api_v2{
 	function start($data,$opt=0){
 		if($opt==0){
 			$opt=array(
-				'access_token'=>'565975d7d7d01462245984408739804d',
+				'access_token'=>'5753fe38833fb41b72b005d86211aa80492dd737a55b086e4ecec96451e0be1bc85665540e25cff9ee567e36a5fd28bbcb645d300b4d2528d2f9a45ce09c1fee',
 				'app_key'=>'96a3e23a32d4b81894061fdd29e94319',
 				'app_secret'=>'565975d7d7d01462245984408739804d'
 			);
