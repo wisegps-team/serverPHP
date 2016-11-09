@@ -8,7 +8,18 @@
   * 如果已经预订，则注册，添加车辆，绑定设备
   * 由于用户是关注不同代理商的公众号，所以代理商公众号的微信appid和appsecret是通过$_GET获取的
   */
-
+date_default_timezone_set('PRC'); 
+include 'api_v2.php';
+include 'papiApi.php';
+include 'WX.php';
+$API=new api_v2();//api接口类
+$papi=new papiApi();
+$opt=array(
+    'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
+    'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
+    'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
+    'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
+);
 //define your token
 define("TOKEN", "baba");
 trackHttp();
@@ -41,25 +52,25 @@ class wechatCallbackapiTest
 
       	//extract post data
 		if (!empty($postStr)){
-                
+                //解析xml
               	$postObj = simplexml_load_string($postStr, 'SimpleXMLElement', LIBXML_NOCDATA);
 
                 $RX_TYPE = trim($postObj->MsgType);
 
                 switch($RX_TYPE){
-                    case "event":
+                    case "event"://事件推送
                         $result = $this->receiveEvent($postObj);
                         break;
-                    case "text":
+                    case "text"://收到文字信息
                         $result = $this->receiveText($postObj);
                         break;
-                    case "image":
+                    case "image"://收到图片信息
                         $result = $this->receiveImage($postObj);
                         break;
-                    case "voice":
+                    case "voice"://收到语言信息
                         $result = $this->receiveVoice($postObj);
                         break;
-                    case "location":
+                    case "location"://收到位置信息
                         $result = $this->receiveLocation($postObj);
                         break;
                     default:
@@ -95,62 +106,23 @@ class wechatCallbackapiTest
     private function receiveEvent($object){
         $content = "";
         switch($object->Event){
-            case "subscribe":
-                $content = "欢迎您进入WiCARE车联网世界。";
-                // 设置菜单
-                $jsonmenu = '{
-                    "button": [
-                        {
-                            "type": "view",
-                            "name": "我的主页",
-                            "url": "http://h5.bibibaba.cn/baba/wx/src/baba/air_home.html"
-                        },
-                        {
-                            "type": "view",
-                            "name": "排行榜",
-                            "url": "http://h5.bibibaba.cn/baba/wx/src/baba/rank.html"
-                        },
-                        {
-                            "name": "更多",
-                            "sub_button": [
-                                {
-                                    "type": "view",
-                                    "name": "我的资料",
-                                    "url": "http://h5.bibibaba.cn/baba/wx/src/baba/user_data.html?temporary=1"
-                                },
-                                {
-                                    "type": "view",
-                                    "name": "我的车辆",
-                                    "url": "http://h5.bibibaba.cn/baba/wx/src/baba/my_car.html"
-                                },
-                                {
-                                    "type": "view",
-                                    "name": "商户入口",
-                                    "url": "http://h5.bibibaba.cn/baba/wx/src/home.html"
-                                }
-                            ]
-                        }
-                    ]
-                }';
-                $acess = getAccessToken();
-                $url = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" . $acess;
-                $result = httpPost($url, $jsonmenu);
+            case "subscribe"://未关注扫描二维码
                 if(isset($object->EventKey)){//扫描带参数的二维码关注的
                     $scene=substr($object->EventKey,8);
-                    $content=$this->switchScene($scene);
+                    $content=$this->switchScene($scene,$object->FromUserName);
                 }
                 break;
-            case "SCAN":
-                 $content='感谢您的扫描';
+            case "SCAN"://已关注扫描二维码
+                $content='感谢您的扫描';
                 if(isset($object->EventKey)){//扫描带参数的二维码关注的
                     $scene=$object->EventKey; 
-                    $content=$this->switchScene($scene);
+                    $content=$this->switchScene($scene,$object->FromUserName);
                 }
                 break;
-            case "unsubscribe":
+            case "unsubscribe"://取消关注
                 $content = "";
                 break;
-            case "CLICK":
+            case "CLICK"://点击菜单事件
                 switch($object->EventKey){
 //                    case "V1001_BIND_USER":
 //                        $content = "<a href='https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx789e9656ed870ea9&redirect_uri=http://php.bibibaba.cn/oauth2.php&response_type=code&scope=snsapi_base&state=1#wechat_redirect'>点击绑定用户</a>";
@@ -162,12 +134,139 @@ class wechatCallbackapiTest
         return $result;
     }
 
-    private function switchScene($scene) {
-        $val=substr(strstr($scene,'_'),1);
-        $key=strstr($scene,'_',true);
-        switch($key){
-            case "sellerId":
-                 $content = '<a href="http://h5.bibibaba.cn/baba/wx/src/baba/user_register.html?intent=logout&needOpenId=true&seller_id='.$val.'">点击完成注册</a>';
+    private function switchScene($did,$open_id) {
+        global $opt,$API;
+
+        $device=$API->start(array(//验证设备
+            'method'=>'wicare._iotDevice.get',
+            'did'=>$did,
+            'fields'=>'objectId,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
+        ),$opt);
+        if(!$device||!isset($device['data'])){//已经有账号
+            return '未查找到设备';
+        }
+        $device=$device['data'];
+        if($device['binded']){//已经有账号
+            return '设备已被绑定';
+        }
+
+        //先尝试使用openId登录
+        $user=$API->start(array(
+            'authData.openId' => $open_id,
+            'method'=>'wicare.user.sso_login'
+        ),$opt);
+        if(isset($user['access_token'])){//已经有账号
+            return '您已注册，请进入系统进行设备绑定';
+        }
+
+        $booking=$API->start(array(//获取预订信息
+            'method'=>'wicare.booking.get',
+            'openId'=>$open_id,
+            'status'=>0,
+            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId'
+        ),$opt);
+        if(!$booking||!$booking['data'])
+            $content='设备IMEI：'.$did.'，<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'">请点击注册</a>';
+        else{
+            $booking=$booking['data'];
+            $user=$API->start(array(
+                'method'=>'wicare.user.get',
+                'mobile'=>$booking['mobile'],
+                'fields'=>'objectId,mobile'
+            ),$opt);
+            if(isset($user['objectId'])){//已经有账号
+                return '您已注册，请进入系统进行设备绑定';
+            }
+            $p_user=json_decode($papi->register(array(
+                'phone'=>$booking['mobile'],
+                'pswd'=>substr($booking['mobile'],-6),
+                'imei'=>$did
+            )),true);
+            if($p_user['error']){
+                return '注册失败，'.$p_user['errormsg'];
+            }
+            $user=$API->start(array(//添加用户表
+                'method'=>'wicare.user.create',
+                'mobile'=>$booking['mobile'],
+                'password'=>md5(substr($booking['mobile'],-6)),
+                'userType'=>7,
+                'authData'=>array('openId'=>$open_id)
+            ),$opt);
+            $cust=$API->start(array(//添加用户表
+                'method'=>'wicare.customer.create',
+                'tel'=>$booking['mobile'],
+                'name'=>$booking['name'],
+                'parentId'=>array($device['uid']),
+                'uid'=>$user['objectId'],
+                'userType'=>7,
+                'custType'=>'私家车主',
+                'contact'=>$booking['name']
+            ),$opt);
+            $car=$API->start(array(//添加车辆
+                'method'=>'wicare.vehicle.create',
+                'name'=>$booking['carType']['car_num'],
+                'uid'=>$cust['objectId'],
+                'did'=>$did,
+                'deviceType'=>$device['model']
+            ),$opt);
+            
+            $dev=$API->start(array(//绑定设备
+                'method'=>'wicare._iotDevice.update',
+                '_did'=>$did,
+                'binded'=>true,
+                'bindDate'=>date("Y-m-d h:i:sa"),
+                'vehicleName'=>$booking['carType']['car_num'],
+                'vehicleId'=>$car['objectId'],
+            ),$opt);
+
+            $bo=$API->start(array(//更新预订信息
+                'method'=>'wicare.booking.update',
+                '_objectId'=>$booking['objectId'],
+                'status'=>1,
+                'status1'=>1,
+                'resTime'=>date("Y-m-d h:i:sa"),
+                'did'=>$did
+            ),$opt);
+            //添加出入库记录
+            $pro=$API->start(array(
+                'method'=>'wicare.product.get',
+                'objectId'=>$device['modelId'],
+                'fields'=>'brand,brandId,name,objectId'
+            ),$opt);
+            $MODEL=array(
+                'brand'=>$pro['data']['brand'],
+                'brandId'=>$pro['data']['brandId'],
+                'model'=>$pro['data']['name'],
+                'modelId'=>$pro['data']['objectId'],
+            );
+            $log=array(
+                'method'=>'wicare.deviceLog.create',
+                'did'=>array($did),
+                'from'=>$device['uid'],
+                'fromName'=>'',
+                'to'=>$cust['objectId'],
+                'toName'=>$booking['name'],
+                'status'=>2
+            );
+            $popLog=array(//出库
+                'uid'=>$device['uid'],
+                'type'=>0,
+                'inCount'=>0,
+                'outCount'=>1
+            );
+            $pushLog=array(//下级的入库
+                'uid'=>$cust['objectId'],
+                'type'=>1,
+                'inCount'=>1,
+                'outCount'=>0
+            );
+            $popLog=array_merge($popLog,$log,$MODEL);
+            $pushLog=array_merge($pushLog,$log,$MODEL);
+            //给上一级添加出库信息
+            $API->start($popLog,$opt);
+            //给下一级添加入库信息
+            $API->start($pushLog,$opt);
+            $content='注册成功';
         }
         return $content;
     }
