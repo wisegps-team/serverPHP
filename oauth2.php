@@ -15,9 +15,7 @@ $opt=array(
 if(isset($_GET['code'])){
 
     //根据域名获取公众号信息
-    $_host=$host=$_SERVER['HTTP_HOST'];//当前域名
-    if($host=='user.autogps.cn')
-        $_host='wx.autogps.cn';
+    $_host=$_SERVER['HTTP_HOST'];//当前域名
     
     if(isset($_GET['wx_app_id'])){
         $custData=array(

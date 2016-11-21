@@ -20,6 +20,7 @@ $opt=array(
     'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
     'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
 );
+date_default_timezone_set('PRC');
 //define your token
 define("TOKEN", "baba");
 trackHttp();
@@ -107,6 +108,49 @@ class wechatCallbackapiTest
         $content = "";
         switch($object->Event){
             case "subscribe"://未关注扫描二维码
+                $content = "欢迎您进入WiCARE车联网世界。";
+                $reg='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
+                $my='http://user.autogps.cn/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
+                $home='http://user.autogps.cn/?wx_app_id='.$_GET['wxAppKey'];
+                // 设置菜单
+                $jsonmenu = '{
+                    "button": [
+                        {
+                            "type": "view",
+                            "name": "我的主页",
+                            "url": "'.$home.'"
+                        },
+                        {
+                            "type": "view",
+                            "name": "自定义菜单",
+                            "url": "#"
+                        },
+                        {
+                            "name": "更多",
+                            "sub_button": [
+                                {
+                                    "type": "view",
+                                    "name": "注册",
+                                    "url": "'.$reg.'"
+                                },
+                                {
+                                    "type": "view",
+                                    "name": "我的账号",
+                                    "url": "'.$my.'"
+                                },
+                                {
+                                    "type": "view",
+                                    "name": "车主推荐",
+                                    "url": "#"
+                                }
+                            ]
+                        }
+                    ]
+                }';
+                $acess = getAccessToken();
+                $url = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" . $acess;
+                $result = httpPost($url, $jsonmenu);
+
                 if(isset($object->EventKey)){//扫描带参数的二维码关注的
                     $scene=substr($object->EventKey,8);
                     $content=$this->switchScene($scene,$object->FromUserName);
@@ -134,7 +178,67 @@ class wechatCallbackapiTest
         return $result;
     }
 
-    private function switchScene($did,$open_id) {
+    private function switchScene($scene,$open_id) {
+        global $opt,$API;
+        $id=$API->start(array(
+            'method'=>'wicare.qrData.get',
+            'id'=>$scene,
+            'fields'=>'data'
+        ),$opt);
+        if(!$id['data'])
+            return '二维码不正确，无法获取相关信息';
+        $d=$id['data']['data']['type'];
+        $scene=$id['data']['data']['data'];
+        switch ($d) {
+            case '1000'://imei号
+                return $this->register($scene,$open_id);
+            case '1001'://
+                return $this->booking($scene,$open_id);
+                break;
+            default:
+                return '功能编号未设置'.$d.$scene;
+        }
+    }
+
+    private function booking($booking_id,$open_id){
+        global $opt,$API;
+        $booking=$API->start(array(//获取预订信息
+            'method'=>'wicare.booking.get',
+            'objectId'=>$booking_id,
+            'status'=>0,
+            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,payMoney'
+        ),$opt);
+        if(!$booking['data'])
+            return '无预订信息';
+        if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id)//为自己预订且不是车主
+            return '感谢关注';
+        if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
+            return '请分享该二维码给车主，车主才能获取安装点信息，进行预约安装。<a href="'.$booking['data']['carType']['qrUrl'].'">【二维码】</a>';
+        }
+
+        $activity=$API->start(array(//获取预订信息
+            'method'=>'wicare.activity.get',
+            'objectId'=>$booking['data']['activityId'],
+            'fields'=>'name,price,installationFee,deposit,product'
+        ),$opt);
+        if(!$activity['data'])
+            return '无活动信息';
+        $pay='未预付';
+        if($booking['data']['payStatus']){
+            if($booking['data']['payStatus']==1)
+                $pay='订金：'.$booking['data']['payMoney'];
+            else if($booking['data']['payStatus']==2)
+                $pay='全款+安装费：'.$booking['data']['payMoney'];
+        }
+        return  $activity['data']['name'].'
+预订时间：'.date("Y-m-d h:i",strtotime($booking['data']['createdAt'])).'
+预订人：'.$booking['data']['name'].'/'.$booking['data']['mobile'].'
+客户：'.$booking['data']['userName'].'/'.$booking['data']['userMobile'].'
+产品型号：'.$activity['data']['product'].'/'.$activity['data']['price'].'元（安装费用：'.$activity['data']['installationFee'].'）
+预付款：'.$pay;
+    }
+
+    private function register($did,$open_id){
         global $opt,$API;
 
         $device=$API->start(array(//验证设备
@@ -340,8 +444,7 @@ class wechatCallbackapiTest
 }
 
 function getAccessToken() {
-    include 'WX.php';
-    $wx=new WX($_GET['appid'],$_GET['appsecret']);
+    $wx=new WX($_GET['wxAppKey'],$_GET['wxAppSecret']);
     //测试
     // $wx=new WX('wx9b96a6e2d701fb94','7161735b615cfe687eaa287e64fe5cfa');
     $res=$wx->getToken();

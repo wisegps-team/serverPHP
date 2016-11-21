@@ -14,9 +14,8 @@ $API=new api_v2();//api接口类
 // 	exit;
 // }
 
-$_host=$host=$_SERVER['HTTP_HOST'];//当前域名
-if($host=='user.autogps.cn')
-	$_host='wx.autogps.cn';
+$_host=$_SERVER['HTTP_HOST'];//当前域名
+
 //用于获取app数据
 $appData=array(
 	'domainName' => $_host,
@@ -61,7 +60,7 @@ $serRes=err_exit($serRes);
 $res=array_merge($devRes,$serRes,$appRes);
 
 setcookie('_app_config_',json_encode($res),time()+3600*24*30,"/");
-$url='http://'.$host.$res['enterUrl'];
+$url='http://'.$_host.$res['enterUrl'];
 
 $get='';
 foreach($_GET as $k=>$val) {
@@ -101,11 +100,14 @@ Header("Location: ".$url);
 
 
 function err_exit($arr){
-	if(!$arr||$arr['status_code']){
-		echo 'data error'+json_encode($arr);
+	if(!$arr){
+		echo '服务器正在重启，请稍后重试';
+		exit;
+	}else if($arr['status_code']){
+		echo '服务器错误：'+json_encode($arr);
 		exit;
 	}else if(!$arr['data']){
-		echo 'null data';
+		echo '服务数据为空';
 		exit;
 	}else{
 		return $arr['data'];
