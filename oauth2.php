@@ -6,12 +6,7 @@
  */
 include 'api_v2.php';
 $API=new api_v2();//api接口类
-$opt=array(
-    'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
-    'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
-    'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
-    'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
-);
+
 if(isset($_GET['code'])){
 
     //根据域名获取公众号信息

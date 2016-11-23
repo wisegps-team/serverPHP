@@ -99,3 +99,10 @@ class api_v2{
 function characet($data){
 	return $data;
 }
+
+$opt=array(//wx.autogps.cn 的永久
+	'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c31e019196fcd10f6e7938c80d7c1ec1dcfccb95eb1d13779f51b2b9d043d7f110',
+	'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
+	'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
+	'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
+);

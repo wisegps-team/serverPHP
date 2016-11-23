@@ -47,6 +47,7 @@ switch ($_GET["method"]){
 
 //收到回调，推送给用户
 function postData(){
+	global $opt;
 	//根据imei查到车辆，根据车辆查到客户表，客户表查到用户，获取用户openid，给他推送
 	// $_POST['fileType'];
 	// $_POST['fileUrl'];
@@ -58,12 +59,7 @@ function postData(){
 	$des='报警描述';
 	$title='标题';
 	$remark='备注';
-	$opt=array(
-		'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
-		'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
-		'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
-		'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
-	);
+
 	$API=new api_v2();//api接口类
 	//用于获取车辆数据
 	$vehicle=$API->start(array(
