@@ -42,16 +42,19 @@ class WX{
 		return $json;
 	}
 
+	//获取凭证
 	function getToken() {
 		$json=$this->getTokenAndTicket();
 		return array("access_token"=>$json['access_token'],"expires"=>$json['expires']);
 	}
 
+	//获取票据
 	function getTicket(){
 		$json=$this->getTokenAndTicket();
 		return array("ticket"=>$json['ticket'],"expires"=>$json['expires']);
 	}
 
+	//生成二维码
 	function getQrcode($msg){
 		$token=$this->getToken();
 		$url=WX::wx_url.'qrcode/create?access_token='.$token['access_token'];
@@ -60,13 +63,24 @@ class WX{
 		return $json;
 	}
 
+	//发送模板消息
 	function sendWeixin($open_id,$template_id,$data,$link){
-		$res=$this->getToken();
-		$acess = $res['access_token'];
-		$url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=' . $acess;
+		$token=$this->getToken();
+		$url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=' . $token['access_token'];
 		$data = '{"touser":"' . $open_id . '","template_id":"'. $template_id .'","url":"'. $link .'",' .
 		    '"data": '. $data . '}';
 		return $this->httpPost($url, $data);
+	}
+
+	//获取并添加模板
+	function addTemplate($template_id){
+		$tem=$this->getToken();
+		$token=$tem['access_token'];
+		$url='https://api.weixin.qq.com/cgi-bin/template/api_add_template?access_token='.$token;
+		$data='{
+           "template_id_short":"'.$template_id.'"
+       	}';
+		return json_decode($this->httpPost($url, $data),true);
 	}
 
 

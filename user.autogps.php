@@ -14,12 +14,7 @@ include 'papiApi.php';
 include 'WX.php';
 $API=new api_v2();//api接口类
 $papi=new papiApi();
-$opt=array(
-    'access_token'=>'3a9557ed4250440ec57b53564e391cb50ada46ae97bc96c6abf0c3a7a3b501c3b7c93e803c9016924569a69f7e1d4222b39bb1bd39c70601cbcb8cbe953e0bfe',
-    'app_key'=>'0642502f628a83433f0ba801d0cae4ef',
-    'dev_key'=>'86e3ddeb8db36cbf68f10a8b7d05e7ac',
-    'app_secret'=>'15fe3ee5197e8ba810512671483d2697'
-);
+
 date_default_timezone_set('PRC');
 //define your token
 define("TOKEN", "baba");
@@ -105,6 +100,7 @@ class wechatCallbackapiTest
 	}
 
     private function receiveEvent($object){
+        global $opt,$API;
         $content = "";
         switch($object->Event){
             case "subscribe"://未关注扫描二维码
@@ -112,6 +108,16 @@ class wechatCallbackapiTest
                 $reg='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
                 $my='http://user.autogps.cn/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
                 $home='http://user.autogps.cn/?wx_app_id='.$_GET['wxAppKey'];
+
+                $wei=$API->start(array(
+                    'method'=>'wicare.weixin.get',
+                    'wxAppKey'=>$_GET['wxAppKey'],
+                    'fields'=>'menu'
+                ),$opt);
+                if($wei['data']&&$wei['data']['menu'])
+                    $menu=json_encode($wei['data']['menu']).',';
+                else
+                    $menu='';
                 // 设置菜单
                 $jsonmenu = '{
                     "button": [
@@ -120,11 +126,7 @@ class wechatCallbackapiTest
                             "name": "我的主页",
                             "url": "'.$home.'"
                         },
-                        {
-                            "type": "view",
-                            "name": "自定义菜单",
-                            "url": "#"
-                        },
+                        '.$menu.'
                         {
                             "name": "更多",
                             "sub_button": [
@@ -235,7 +237,8 @@ class wechatCallbackapiTest
 预订人：'.$booking['data']['name'].'/'.$booking['data']['mobile'].'
 客户：'.$booking['data']['userName'].'/'.$booking['data']['userMobile'].'
 产品型号：'.$activity['data']['product'].'/'.$activity['data']['price'].'元（安装费用：'.$activity['data']['installationFee'].'）
-预付款：'.$pay;
+预付款：'.$pay.'
+<a href="http://user.autogps.cn/autogps/booking_install.html?intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'].'">请点击进入选择安装网点</a>';
     }
 
     private function register($did,$open_id){
@@ -267,23 +270,23 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'openId'=>$open_id,
             'status'=>0,
-            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId'
+            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile'
         ),$opt);
         if(!$booking||!$booking['data'])
             $content='设备IMEI：'.$did.'，<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'">请点击注册</a>';
         else{
             $booking=$booking['data'];
             $user=$API->start(array(
-                'method'=>'wicare.user.get',
-                'mobile'=>$booking['mobile'],
-                'fields'=>'objectId,mobile'
+                'method'=>'wicare.customer.get',
+                'tel'=>$booking['userMobile'],
+                'fields'=>'objectId,tel'
             ),$opt);
-            if(isset($user['objectId'])){//已经有账号
+            if(isset($user['data'])){//已经有账号
                 return '您已注册，请进入系统进行设备绑定';
             }
             $p_user=json_decode($papi->register(array(
-                'phone'=>$booking['mobile'],
-                'pswd'=>substr($booking['mobile'],-6),
+                'phone'=>$booking['userMobile'],
+                'pswd'=>substr($booking['userMobile'],-6),
                 'imei'=>$did
             )),true);
             if($p_user['error']){
@@ -291,14 +294,14 @@ class wechatCallbackapiTest
             }
             $user=$API->start(array(//添加用户表
                 'method'=>'wicare.user.create',
-                'mobile'=>$booking['mobile'],
-                'password'=>md5(substr($booking['mobile'],-6)),
+                'mobile'=>$booking['userMobile'],
+                'password'=>md5(substr($booking['userMobile'],-6)),
                 'userType'=>7,
                 'authData'=>array('openId'=>$open_id)
             ),$opt);
             $cust=$API->start(array(//添加用户表
                 'method'=>'wicare.customer.create',
-                'tel'=>$booking['mobile'],
+                'tel'=>$booking['userMobile'],
                 'name'=>$booking['name'],
                 'parentId'=>array($device['uid']),
                 'uid'=>$user['objectId'],
