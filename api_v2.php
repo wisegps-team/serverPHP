@@ -41,6 +41,7 @@ class api_v2{
 			$str.=$x.$val;
 			$url.=$x."=".$val."&";
 		}
+		$url = str_replace('+','%2B', $url); 
 		if($p['method']!='wicare.cache.getObj'){
 			$str=$opt['app_secret'].$str.$opt['app_secret'];
 		}

@@ -15,7 +15,6 @@ include 'WX.php';
 $API=new api_v2();//api接口类
 $papi=new papiApi();
 
-date_default_timezone_set('PRC');
 //define your token
 define("TOKEN", "baba");
 trackHttp();
@@ -284,24 +283,27 @@ class wechatCallbackapiTest
             if(isset($user['data'])){//已经有账号
                 return '您已注册，请进入系统进行设备绑定';
             }
-            $p_user=json_decode($papi->register(array(
-                'phone'=>$booking['userMobile'],
-                'pswd'=>substr($booking['userMobile'],-6),
-                'imei'=>$did
-            )),true);
-            if($p_user['error']){
-                return '注册失败，'.$p_user['errormsg'];
-            }
+            $phone=$booking['userMobile'];
+            if(!$booking['userMobile'])
+                $phone=$booking['mobile'];
+            // $p_user=json_decode($papi->register(array(
+            //     'phone'=>$phone,
+            //     'pswd'=>substr($phone,-6),
+            //     'imei'=>$did
+            // )),true);
+            // if($p_user['error']){
+            //     return '注册失败，'.$p_user['errormsg'];
+            // }
             $user=$API->start(array(//添加用户表
                 'method'=>'wicare.user.create',
-                'mobile'=>$booking['userMobile'],
-                'password'=>md5(substr($booking['userMobile'],-6)),
+                'mobile'=>$phone,
+                'password'=>md5(substr($phone,-6)),
                 'userType'=>7,
                 'authData'=>array('openId'=>$open_id)
             ),$opt);
             $cust=$API->start(array(//添加用户表
                 'method'=>'wicare.customer.create',
-                'tel'=>$booking['userMobile'],
+                'tel'=>$phone,
                 'name'=>$booking['name'],
                 'parentId'=>array($device['uid']),
                 'uid'=>$user['objectId'],
@@ -379,7 +381,10 @@ class wechatCallbackapiTest
     }
 
     private function receiveText($object){
-        $content = "有任何的问题，可以咨询我们的客服哦！";
+        if($object->Content=='test_server')
+            $content = "服务器url配置成功！";
+        else
+            $content = "如果有问题请留言，我们将会在2个工作日内回复";
         // $lottery = getLottery($object->FromUserName);
         // addlog($lottery);
         // $c = $lottery["total"];
