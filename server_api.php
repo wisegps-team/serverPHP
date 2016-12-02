@@ -160,7 +160,8 @@ function getUserOpenId(){
 //设置微信推送模板
 function setWxTemplate(){
 	global $opt,$API;
-	$temp=array('OPENTM407674335','OPENTM405760757');
+				//预订成功通知      服务预约成功通知   账户余额变动提醒   待支付提醒		  账单异常处理提醒
+	$temp=array('OPENTM407674335','OPENTM405760757','OPENTM405774153','OPENTM406963151','OPENTM401266811');
 	$arrlength=count($temp);
 	$wei=getWeixin();
 	$wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
@@ -198,14 +199,19 @@ function checkExists(){
 	$user=$API->start(array(
 		'method'=>'wicare.user.get',
 		'mobile'=>$_GET['mobile'],
-		'fields'=>'objectId,authData'
+		'fields'=>'objectId,authData,userType'
 	),$opt);
 	if($user['data']){
-		$cust=$API->start(array(
+		$d=array(
 			'method'=>'wicare.customer.get',
 			'uid'=>$user['data']['objectId'],
 			'fields'=>'objectId,name'
-		),$opt);
+		);
+		if($user['data']['userType']==9){
+			$d['method']='wicare.employee.get';
+		}
+		
+		$cust=$API->start($d,$opt);
 		if($cust['data'])
 			$res['exist']=true;
 	}
