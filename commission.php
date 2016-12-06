@@ -4,7 +4,9 @@
  * 本页面获取到openid并且根据传递的参数进行下单，直接echo到页面
  */
 include 'api_v2.php';
+include 'checkAndPay.php';
 $API=new api_v2();//api接口类
+session_start();
 
 function https_request($url){
     $curl = curl_init();
@@ -20,6 +22,12 @@ function https_request($url){
     return $data;
 }
 
+//输出错误信息并退出脚本
+function echoExit($str){
+	echo '<h1>'.$str.'</h1>';
+	exit;
+}
+
 function getOpenid($code,$appid,$appsecret){
     $access_token = "";
     // 根据code获取access_token
@@ -28,81 +36,126 @@ function getOpenid($code,$appid,$appsecret){
     $access_token_array = json_decode($access_token_json, true);
     $access_token = $access_token_array['access_token'];
     if(!$access_token){
-        echo 'code不正确';
-        exit;
+        echoExit('code不正确');
     }
 
     return $openid = $access_token_array['openid'];
 }
 
-function getOrderUid($uid){
+function getOrder(){
     global $opt,$API;
-    $user=$API->start(array(
-        'mobile' => $uid,
-        'method'=>'wicare.user.get',
-        'fields'=>'objectId'
+    $order=$API->start(array(
+        'method'=>'wicare.order.get',
+        'oid'=>$_GET['oid'],
+        'fields'=>'uid,to_uid,attach,amount'
     ),$opt);
-    if($user['data'])
-        return $user['data']['objectId'];
-    echo '无公帐信息，无法下单';
-    exit;
+    if($order&&$order['data'])
+        return $order['data'];
+    else
+        echoExit('没有找到原订单');
 }
 
-if(isset($_GET['code'])){
+function getToUid($order){
+    $str=$order['attach'];
+    $i=strrchr($str,',');
+    return substr($str,$i);
+}
+
+function getBookingId($order){
+    $str=$order['attach'];
+    $i=strpos($str,',');
+    return substr($str,0,$i);
+}
+
+function getBooking($id){
+    global $opt,$API;
+    $order=$API->start(array(
+        'method'=>'wicare.booking.get',
+        'objectId'=>$id,
+        'fields'=>'sellerId,userName,userMobile'
+    ),$opt);
+    if($order&&$order['data'])
+        return $order['data'];
+    else
+        echoExit('没有找到原订单');
+}
+
+if(isset($_POST['oid'])){//支付成功之后
+    if($_POST['oid']!=$_SESSION['oid']){//被篡改
+        echoExit('支付成功，但oid不正确');
+    }     
+    $cid=$_SESSION['cid'];
+    //获取配置的营销号
+    $wei=pfb::getWeixin($cid);
+    if(!$wei){
+        echoExit('支付成功，但营销号未正确配置，无法推送余额信息');
+    }        
+    $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+    $cust=pfb::getCustomer($cid);//customer表记录
+    $pay_user=pfb::getPayUser($cust);//商户公帐
+    $user=pfb::getUser($cust['uid']);//管理员user表记录
+    $cust_openId=pfb::getOpenId($user);//商户管理员的openId
+
+    $bookingId=$_SESSION['bookingId'];
+    $booking=getBooking($bookingId);
+    $emp=pfb::getEmployee($booking['sellerId']);
+    if(!$emp){//错误
+        echoExit('支付成功，但获取人员推送失败，请截图联系技术人员，bookingId='.$bookingId);
+    }
+    $e_user=pfb::getUser($emp['uid']);
+    $remark=$booking['userName'].'/'.$booking['userMobile'].'注册佣金';
+
+    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$_SESSION['receipt']);
+    echoExit('支付成功，请关闭本页面');
+}else if(isset($_GET['code'])){
     //根据域名获取公众号信息
     $_host=$_SERVER['HTTP_HOST'];//当前域名
-    if(isset($_GET['wx_app_id'])){
-        $appRes=$API->start(array(
-            'wxAppKey' => $_GET['wx_app_id'],
-            'method'=>'wicare.weixin.get',
-            'fields'=>'wxAppKey,wxAppSecret'
-        ),$opt);
-    }else{
-        //用于获取app数据
-        $appData=array(
-            'domainName' => $_host,
-            'method'=>'wicare.app.get',
-            'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
-        );
-        //获取app数据
-        $appRes=$API->start($appData);
-    }
+    //用于获取app数据
+    $appData=array(
+        'domainName' => $_host,
+        'method'=>'wicare.app.get',
+        'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
+    );
+    //获取app数据
+    $appRes=$API->start($appData);
     
     if(!$appRes||!$appRes['data']){
-        echo '微信appKey配置不对，无法下单';
-        exit;
+        echoExit('微信appKey配置不对，无法下单');
     }
     $appData=$appRes['data'];
 
     $code = $_GET['code'];
     $openid = getOpenid($code,$appData['wxAppKey'],$appData['wxAppSecret']);
-
-    // if($_GET['isCust']==1)
-    //     $uid=getOrderUid($_GET['uid']);
-    $uid=$_GET['uid'];
+    $o_order=getOrder();
+    if($o_order['flag']==1)
+        echoExit('佣金已支付');
     //下单
+    $to_uid=getToUid($o_order);
+    if(!$to_uid)
+        echoExit('无佣金收取方');
     $order=$API->start(array(
         'method'=>'wicare.pay.weixin',
         'open_id'=>$openid,
-        'uid'=>$uid,
-        'order_type'=>$_GET['order_type'],
-        'remark'=>$_GET['remark'],
-        'attach'=>$_GET['attach'],
-        'amount'=>$_GET['amount']
+        'uid'=>$o_order['uid'],
+        'to_uid'=>$to_uid,
+        'order_type'=>1,
+        'remark'=>'微信支付佣金',
+        'attach'=>$o_order['attach'],
+        'amount'=>$o_order['amount']
     ),$opt);
-    
-    if($_GET['order_type']==3){
-        echo '<h1>提现成功，可能需要一段时间到账，请等待微信零钱包通知</h1>';
-        exit();
-    }
     if($order['status_code']||!$order['pay_args']){
-        echo '下单失败，'.json_encode($order);
-        exit;
+        echoExit('下单失败，'.json_encode($order));
     }
+    $oid=$order['objectId'];
+    $_SESSION['oid']=$order['objectId'];//新的oid
+    $_SESSION['commission']=$o_order['amount'];//佣金
+    $_SESSION['bookingId']=getBookingId($o_order);//预订id
+    $_SESSION['receipt']=$_GET['receipt'];//预付款到帐金额
+    $_SESSION['cid']=$_GET['cid'];//公司id
+    
     $pay_args=json_encode($order['pay_args']);
-}else{
-    echo 'No code';
-    exit();
+}else {
+    echoExit('No code');
 }
 ?>
 
@@ -164,16 +217,17 @@ if(isset($_GET['code'])){
 		<div class="bottom">
 			<button id="pay">确认支付</button>
 		</div>
+        <from id="f" action="#" method="post">
+            <input type="hidden" name="oid" value="<?php echo $oid; ?>"> 
+        </from>
 	</body>
 	<script>
 	function weixinCallback(res) {//微信支付返回
         res.orderId=oid;
 		localStorage.setItem(_g.key,JSON.stringify(res));
 		if (res.err_msg == "get_brand_wcpay_request:ok") {
-            if(_g.callback)
-                location=_g.callback;
-            else
-                history.back(-2);//跳回授权之前的页
+            var f=document.getElementById("f");
+            f.submit();
 		} else if(res.err_msg == "get_brand_wcpay_request：cancel"){
 			pay.canPay=false;
 			document.getElementById("pay").innerText="确认支付";

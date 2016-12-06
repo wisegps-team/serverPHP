@@ -3,8 +3,10 @@
  *一些操作服务器资源的api，例如保存微信授权凭证
  *
  **/
+date_default_timezone_set('PRC'); 
 include 'WX.php';
 include 'api_v2.php';
+include 'checkAndPay.php';
 header('Access-Control-Allow-Origin: *');
 header('Content-type:application/json; charset=utf-8'); 
 $API=new api_v2();//api接口类
@@ -40,6 +42,9 @@ switch ($_GET["method"]){
 		break;
 	case "checkExists"://检查用户是否已注册（特指user表和customer都存在的情况）
 		checkExists();
+		break;
+	case "addAndBind"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
+		addAndBindCar();
 		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
@@ -216,6 +221,49 @@ function checkExists(){
 			$res['exist']=true;
 	}
 	echo json_encode($res);
+}
+
+//校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
+function addAndBindCar(){
+	global $opt,$API;
+	$did=$_GET['did'];
+	$uid=$_GET['uid'];
+	$open_id=$_GET['openId'];
+	$phone=$_GET['mobile'];
+	$name=$_GET['name'];
+
+	$device=$API->start(array(//验证设备
+		'method'=>'wicare._iotDevice.get',
+		'did'=>$did,
+		'fields'=>'objectId,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
+	),$opt);
+	if(!$device||!isset($device['data'])){
+		echoExit(123,'未查找到设备');
+	}
+	if($device['data']['binded']){//已经有账号
+		echoExit(123,'设备已被绑定');
+	}
+	$device=$device['data'];
+
+	$booking=$API->start(array(//获取预订信息
+		'method'=>'wicare.booking.get',
+		'userMobile'=>$phone,
+		'status'=>0,
+		'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile'
+	),$opt);
+	if(!$booking||!$booking['data'])
+		$booking=null;
+	else
+		$booking=$booking['data'];
+	//添加车辆绑定设备
+	$device=addAndBind($uid,$booking,$device,$open_id,$phone,$name);
+	if(!is_array($device)){
+		echo '{"status_code":"'.$device.'"}';
+	}
+
+	echo '{"status_code":0}';
+	//添加出入库记录
+	addDeviceLog($device,$uid,$booking['name'],$booking);
 }
 
 
