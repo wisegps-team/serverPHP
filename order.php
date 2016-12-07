@@ -6,6 +6,12 @@
 include 'api_v2.php';
 $API=new api_v2();//api接口类
 
+//输出错误信息并退出脚本
+function echoExit($str){
+	echo '<h1>'.$str.'</h1>';
+	exit;
+}
+
 function https_request($url){
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
@@ -28,57 +34,86 @@ function getOpenid($code,$appid,$appsecret){
     $access_token_array = json_decode($access_token_json, true);
     $access_token = $access_token_array['access_token'];
     if(!$access_token){
-        echo 'code不正确';
+        echo 'code不正确<br>';
+        echo $_SERVER['QUERY_STRING'];
         exit;
     }
 
     return $openid = $access_token_array['openid'];
 }
 
-function getOrderUid($uid){
+
+function checkPSW(){
     global $opt,$API;
+    if($_GET['order_type']!=3)return;//提现才需要校验密码
+
+    $uid=$_GET['uid'];
+    $psw=$_GET['psw'];
+    $type=$_GET['uidType'];
+
+    if($type==1){//公帐需要校验管理员密码
+        $cust=$API->start(array(
+            'method'=>'wicare.customer.get',
+            'objectId'=>$uid,
+            'fields'=>'objectId,uid'
+        ),$opt);
+        if(!$cust||!$cust['data']){
+            echoExit('公司账号获取失败：'.json_encode($cust));
+        }
+        $uid=$cust['data']['uid'];
+    }
     $user=$API->start(array(
-        'mobile' => $uid,
         'method'=>'wicare.user.get',
+        'objectId'=>$uid,
+        'password'=>$psw,
         'fields'=>'objectId'
     ),$opt);
-    if($user['data'])
-        return $user['data']['objectId'];
-    echo '无公帐信息，无法下单';
-    exit;
+    if(!$user&&!$user['data'])//校验失败，退出脚本
+        echoExit('密码错误');
 }
 
 if(isset($_GET['code'])){
     //根据域名获取公众号信息
-    $_host=$_SERVER['HTTP_HOST'];//当前域名
-    if(isset($_GET['wx_app_id'])){
-        $appRes=$API->start(array(
-            'wxAppKey' => $_GET['wx_app_id'],
-            'method'=>'wicare.weixin.get',
-            'fields'=>'wxAppKey,wxAppSecret'
-        ),$opt);
-    }else{
-        //用于获取app数据
-        $appData=array(
-            'domainName' => $_host,
-            'method'=>'wicare.app.get',
-            'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
-        );
-        //获取app数据
-        $appRes=$API->start($appData);
-    }
+    // $_host=$_SERVER['HTTP_HOST'];//当前域名
+    // if(isset($_GET['wx_app_id'])){
+    //     $appRes=$API->start(array(
+    //         'wxAppKey' => $_GET['wx_app_id'],
+    //         'method'=>'wicare.weixin.get',
+    //         'fields'=>'wxAppKey,wxAppSecret'
+    //     ),$opt);
+    // }else{
+    //     //用于获取app数据
+    //     $appData=array(
+    //         'domainName' => $_host,
+    //         'method'=>'wicare.app.get',
+    //         'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
+    //     );
+    //     //获取app数据
+    //     $appRes=$API->start($appData);
+    // }
     
-    if(!$appRes||!$appRes['data']){
-        echo '微信appKey配置不对，无法下单';
-        exit;
-    }
-    $appData=$appRes['data'];
+    // if(!$appRes||!$appRes['data']){
+    //     echo '微信appKey配置不对，无法下单';
+    //     exit;
+    // }
+    // $appData=$appRes['data'];
+
+    //智联车网
+    // $appData=array(
+    //     'wxAppKey'=>'wx76f1169cbd4339c1',
+    //     'wxAppSecret'=>'5485870628e8add2a858a873fbaf4fe5'
+    // );
+
+    //微车联
+    $appData=array(
+        'wxAppKey'=>'wxa5c196f7ec4b5df9',
+        'wxAppSecret'=>'e89542d7376fc479aac35706305fc23f'
+    );
 
     $code = $_GET['code'];
     $openid = getOpenid($code,$appData['wxAppKey'],$appData['wxAppSecret']);
 
-    // if($_GET['isCust']==1)
-    //     $uid=getOrderUid($_GET['uid']);
+    checkPSW();//校验密码
     $uid=$_GET['uid'];
     //下单
     $order=$API->start(array(
@@ -92,17 +127,14 @@ if(isset($_GET['code'])){
     ),$opt);
     
     if($_GET['order_type']==3){
-        echo '<h1>提现成功，可能需要一段时间到账，请等待微信零钱包通知</h1>';
-        exit();
+        echoExit('提现成功，可能需要一段时间到账，请等待微信零钱包通知');
     }
     if($order['status_code']||!$order['pay_args']){
-        echo '下单失败，'.json_encode($order);
-        exit;
+        echoExit('下单失败，'.json_encode($order));
     }
     $pay_args=json_encode($order['pay_args']);
 }else{
-    echo 'No code';
-    exit();
+    echoExit('No code');
 }
 ?>
 

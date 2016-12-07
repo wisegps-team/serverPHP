@@ -217,8 +217,10 @@ class wechatCallbackapiTest
             return '无预订信息';
         if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id)//为自己预订且不是车主
             return '感谢关注';
+
+        $remark='';
         if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
-            return '请分享该二维码给车主，车主才能获取安装点信息，进行预约安装。<a href="'.$booking['data']['carType']['qrUrl'].'">【二维码】</a>';
+            $remark='请分享此二维码给'.$booking['data']['userName'].'（车主）以便其获取授权安装网点信息。<a href="'.$booking['data']['carType']['qrUrl'].'">【二维码】</a>';
         }
 
         $activity=$API->start(array(//获取预订信息
@@ -235,13 +237,15 @@ class wechatCallbackapiTest
             else if($booking['data']['payStatus']==2)
                 $pay='全款+安装费：'.$booking['data']['payMoney'];
         }
+        $in_url='http://user.autogps.cn/autogps/booking_install.html?intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
         return  $activity['data']['name'].'
 预订时间：'.date("Y-m-d h:i",strtotime($booking['data']['createdAt'])).'
 预订人：'.$booking['data']['name'].'/'.$booking['data']['mobile'].'
 客户：'.$booking['data']['userName'].'/'.$booking['data']['userMobile'].'
 产品型号：'.$activity['data']['product'].'/'.$activity['data']['price'].'元（安装费用：'.$activity['data']['installationFee'].'）
 预付款：'.$pay.'
-<a href="http://user.autogps.cn/autogps/booking_install.html?intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'].'">请点击进入选择安装网点</a>';
+<a href="'.$in_url.'">请点击进入选择安装网点</a>
+'.$remark;
     }
 
     private function register($did,$open_id){
@@ -250,7 +254,7 @@ class wechatCallbackapiTest
         $device=$API->start(array(//验证设备
             'method'=>'wicare._iotDevice.get',
             'did'=>$did,
-            'fields'=>'objectId,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
+            'fields'=>'objectId,did,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
         ),$opt);
         if(!$device||!isset($device['data'])){
             return '未查找到设备';
@@ -273,7 +277,7 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'openId'=>$open_id,
             'status'=>0,
-            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile'
+            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile,userName'
         ),$opt);
         if(!$booking||!$booking['data'])
             $content='设备IMEI：'.$did.'，<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'">请点击注册</a>';
@@ -302,12 +306,12 @@ class wechatCallbackapiTest
             }else{
                 $user=$user['data'];
             }
-            $user=$API->start(array(
+            $cust=$API->start(array(
                 'method'=>'wicare.customer.get',
                 'uid'=>$user['objectId'],
                 'fields'=>'objectId,tel'
             ),$opt);
-            if(isset($user['data'])){//已经有账号
+            if(isset($cust['data'])){//已经有账号
                 return '您已注册，请进入系统进行设备绑定';
             }
             
@@ -322,61 +326,13 @@ class wechatCallbackapiTest
                 'contact'=>$name
             ),$opt);
 
-
             //添加车辆绑定设备
-            $device=addAndBind($cust['objectId'],$booking['carType']['car_num'],$device,$open_id,$phone,$name,$booking);
-            // $car=$API->start(array(//添加车辆
-            //     'method'=>'wicare.vehicle.create',
-            //     'name'=>$booking['carType']['car_num'],
-            //     'uid'=>$cust['objectId'],
-            //     'did'=>$did,
-            //     'deviceType'=>$device['model']
-            // ),$opt);
-
-            // $dev=$API->start(array(//活动产品表获取设备安装费用的信息
-            //     'method'=>'wicare.activityProduct.get',
-            //     'uid'=>$device['uid'],
-            //     'productId'=>$device['modelId'],
-            //     'fields'=>'objectId,uid,price,installationFee,reward,name,productId,brandId,brand'
-            // ),$opt);
-            // if(!$dev||!isset($dev['data'])){//活动产品表返回空
-            //     return '此产品无活动';
-            // }
-            // $device=array_merge($device,$dev);
-
-            // $_device=$API->start(array(//绑定设备
-            //     'method'=>'wicare._iotDevice.update',
-            //     '_did'=>$did,
-            //     'binded'=>true,
-            //     'bindDate'=>date("Y-m-d h:i:sa"),
-            //     'vehicleName'=>$booking['carType']['car_num'],
-            //     'vehicleId'=>$car['objectId'],
-            // ),$opt);
-
-            // $bo=$API->start(array(//更新预订信息
-            //     'method'=>'wicare.booking.update',
-            //     '_objectId'=>$booking['objectId'],
-            //     'status'=>1,
-            //     'status1'=>1,
-            //     'resTime'=>date("Y-m-d h:i:sa"),
-            //     'did'=>$did,
-            //     'userOpenId'=>$open_id,
-            //     'res.openId'=>$open_id,
-            //     'res.mobile'=>$phone,
-            //     'res.name'=>$name,
-            //     'res.seller'=>$device['uid'],
-            //     'res.product'=>$device['model'],
-            //     'res.productId'=>$device['modelId'],
-            //     'res.price'=>$device['price'],
-            //     'res.installationFee'=>$device['installationFee'],
-            //     'res.reward'=>$device['reward']
-            // ),$opt);
-
+            $device=addAndBind($cust['objectId'],'默认车牌',$device,$open_id,$phone,$name,$booking);
 
             //保存一个匿名方法，把响应返回给微信之后调用
-            array_push($longTimeTask,function() use($device,$did,$cust,$booking,$phone){
+            $i=count($longTimeTask);
+            $longTimeTask[$i]=function() use($device,$did,$cust,$booking,$phone){
                 global $opt,$API,$papi;
-
                 $p_user=json_decode($papi->register(array(
                     'phone'=>$phone,
                     'pswd'=>substr($phone,-6),
@@ -385,52 +341,8 @@ class wechatCallbackapiTest
                 if($p_user['error']){
                     $error='注册失败，'.$p_user['errormsg'];
                 }
-
                 addDeviceLog($device,$cust['objectId'],$booking['name'],$booking);
-                //以下封装
-                // //添加出入库记录
-                // $pro=$API->start(array(
-                //     'method'=>'wicare.product.get',
-                //     'objectId'=>$device['modelId'],
-                //     'fields'=>'brand,brandId,name,objectId'
-                // ),$opt);
-                // $MODEL=array(
-                //     'brand'=>$pro['data']['brand'],
-                //     'brandId'=>$pro['data']['brandId'],
-                //     'model'=>$pro['data']['name'],
-                //     'modelId'=>$pro['data']['objectId'],
-                // );
-                // $log=array(
-                //     'method'=>'wicare.deviceLog.create',
-                //     'did'=>array($did),
-                //     'from'=>$device['uid'],
-                //     'fromName'=>'',
-                //     'to'=>$cust['objectId'],
-                //     'toName'=>$booking['name'],
-                //     'status'=>2
-                // );
-                // $popLog=array(//出库
-                //     'uid'=>$device['uid'],
-                //     'type'=>0,
-                //     'inCount'=>0,
-                //     'outCount'=>1
-                // );
-                // $pushLog=array(//下级的入库
-                //     'uid'=>$cust['objectId'],
-                //     'type'=>1,
-                //     'inCount'=>1,
-                //     'outCount'=>0
-                // );
-                // $popLog=array_merge($popLog,$log,$MODEL);
-                // $pushLog=array_merge($pushLog,$log,$MODEL);
-                // //给上一级添加出库信息
-                // $API->start($popLog,$opt);
-                // //给下一级添加入库信息
-                // $API->start($pushLog,$opt);
-
-                // checkAndPay($booking,$device['uid'],$device,true);
-            });
-            
+            };
             $content='注册成功';
         }
         return $content;
@@ -579,8 +491,11 @@ function doLongTimeTask(){
     header("Connection: Close"); //告诉浏览器关闭当前连接,即为短连接
     ob_flush();
     flush();
-
     //$longTimeTask是一个全局方法数组，在本页脚本内任意地方push进去，在这里遍历执行它
+    $arrlength=count($longTimeTask);
+	for($i=0;$i<$arrlength;$i++){
+		$longTimeTask[$i]();
+	}
 }
 
 ?>

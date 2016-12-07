@@ -256,7 +256,7 @@ function addAndBindCar(){
 	else
 		$booking=$booking['data'];
 	//添加车辆绑定设备
-	$device=addAndBind($uid,$booking,$device,$open_id,$phone,$name);
+	$device=addAndBind($uid,'默认车牌',$device,$open_id,$phone,$name);
 	if(!is_array($device)){
 		echo '{"status_code":"'.$device.'"}';
 	}
