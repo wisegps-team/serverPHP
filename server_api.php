@@ -46,6 +46,9 @@ switch ($_GET["method"]){
 	case "addAndBind"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
 		addAndBindCar();
 		break;
+	case "setMenu"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
+		setMenu();
+		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
 		exit;
@@ -249,7 +252,7 @@ function addAndBindCar(){
 		'method'=>'wicare.booking.get',
 		'userMobile'=>$phone,
 		'status'=>0,
-		'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile'
+		'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
 	),$opt);
 	if(!$booking||!$booking['data'])
 		$booking=null;
@@ -266,6 +269,52 @@ function addAndBindCar(){
 	addDeviceLog($device,$uid,$booking['name'],$booking);
 }
 
+//给指定微信号设置车主菜单
+function setMenu(){
+	$wei=getWeixin();
+	if($wei['type']==1){
+		echoExit(0,'');
+	}
+	$reg='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
+	$my='http://user.autogps.cn/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
+	$home='http://user.autogps.cn/?wx_app_id='.$_GET['wxAppKey'];
+
+	if(isset($wei['menu'])&&!isset($wei['menu']['none']))
+		$menu=unicodeJson($wei['menu']).',';
+	else
+		$menu='';
+	// 设置菜单
+	$jsonmenu = '{
+		"button": [
+			{
+				"type": "view",
+				"name": "我的主页",
+				"url": "'.$home.'"
+			},
+			'.$menu.'
+			{
+				"name": "更多",
+				"sub_button": [
+					{
+						"type": "view",
+						"name": "我的账号",
+						"url": "'.$my.'"
+					},
+					{
+						"type": "view",
+						"name": "车主推荐",
+						"url": "'.$my.'"
+					}
+				]
+			}
+		]
+	}';
+	// echo $jsonmenu;
+
+	$wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+	echo json_encode($wx->setMenu($jsonmenu));
+}
+
 
 
 
@@ -278,7 +327,7 @@ function getWeixin(){
 	$_wx=array(
 		'method'=>'wicare.weixin.get',
 		'wxAppKey'=>$_GET['wxAppKey'],
-		'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template'
+		'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template,menu'
 	);
 	$wei=$API->start($_wx,$opt);
 
@@ -301,3 +350,15 @@ function addQr($type,$data){
 	),$opt);
 	return $id['autoId'];
 }
+
+//把json中unicode编码的中文，转换成utf-8
+function unicodeJson($str){  
+	$json = json_encode($str);  
+	return preg_replace_callback(
+        "#\\\u([0-9a-f]+)#i",
+        function ($matches) {
+            return iconv('UCS-2','UTF-8', pack('H4',$matches[1]));
+        },
+        $json
+    );  
+}  

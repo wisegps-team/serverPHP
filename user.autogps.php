@@ -191,7 +191,7 @@ class wechatCallbackapiTest
             'fields'=>'data'
         ),$opt);
         if(!$id['data'])
-            return '二维码不正确，无法获取相关信息';
+            return '二维码不正确，无法获取相关信息'.json_encode($id);
         $d=$id['data']['data']['type'];
         $scene=$id['data']['data']['data'];
         switch ($d) {
@@ -211,7 +211,7 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'objectId'=>$booking_id,
             'status'=>0,
-            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,payMoney'
+            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,orderId,payMoney'
         ),$opt);
         if(!$booking['data'])
             return '无预订信息';
@@ -237,9 +237,9 @@ class wechatCallbackapiTest
             else if($booking['data']['payStatus']==2)
                 $pay='全款+安装费：'.$booking['data']['payMoney'];
         }
-        $in_url='http://user.autogps.cn/autogps/booking_install.html?intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
+        $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
         return  $activity['data']['name'].'
-预订时间：'.date("Y-m-d h:i",strtotime($booking['data']['createdAt'])).'
+预订时间：'.date("Y-m-d H:i",strtotime($booking['data']['createdAt'])).'
 预订人：'.$booking['data']['name'].'/'.$booking['data']['mobile'].'
 客户：'.$booking['data']['userName'].'/'.$booking['data']['userMobile'].'
 产品型号：'.$activity['data']['product'].'/'.$activity['data']['price'].'元（安装费用：'.$activity['data']['installationFee'].'）
@@ -275,9 +275,9 @@ class wechatCallbackapiTest
 
         $booking=$API->start(array(//获取预订信息
             'method'=>'wicare.booking.get',
-            'openId'=>$open_id,
+            'userOpenId'=>$open_id,
             'status'=>0,
-            'fields'=>'objectId,activityId,mobile,sellerId,uid,name,carType,installId,userMobile,userName'
+            'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
         ),$opt);
         if(!$booking||!$booking['data'])
             $content='设备IMEI：'.$did.'，<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'">请点击注册</a>';

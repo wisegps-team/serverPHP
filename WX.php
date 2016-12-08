@@ -1,6 +1,7 @@
 <?php
 class WX{
 	const wx_url="https://api.weixin.qq.com/cgi-bin/";
+
 	function __construct($appId="wxa5c196f7ec4b5df9",$appSecret="e89542d7376fc479aac35706305fc23f",$fileName="tokenAndTicket.json") {
 	    $this->appId=$appId;
 	    $this->appSecret=$appSecret;
@@ -83,6 +84,14 @@ class WX{
 		return json_decode($this->httpPost($url, $data),true);
 	}
 
+	//设置菜单
+	function setMenu($jsonmenu){
+		$tem=$this->getToken();
+		$token=$tem['access_token'];
+		$url='https://api.weixin.qq.com/cgi-bin/menu/create?access_token='.$token;
+		return json_decode($this->httpPost($url,$jsonmenu),true);
+	}
+
 
 
 	function httpGet($url) {
@@ -115,4 +124,20 @@ class WX{
 	    curl_close($ch);
 	    return $result;
 	}
+
+	public function payAppData(){
+        //微车联
+		$wcl=array(
+			'wxAppKey'=>'wxa5c196f7ec4b5df9',
+			'wxAppSecret'=>'e89542d7376fc479aac35706305fc23f'
+		);
+
+		//智联车网
+		$zlcw=array(
+			'wxAppKey'=>'wx76f1169cbd4339c1',
+			'wxAppSecret'=>'5485870628e8add2a858a873fbaf4fe5'
+		);
+
+		return $wcl;
+    }
 }

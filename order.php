@@ -4,8 +4,8 @@
  * 本页面获取到openid并且根据传递的参数进行下单，直接echo到页面
  */
 include 'api_v2.php';
+include 'WX.php';
 $API=new api_v2();//api接口类
-
 //输出错误信息并退出脚本
 function echoExit($str){
 	echo '<h1>'.$str.'</h1>';
@@ -105,10 +105,7 @@ if(isset($_GET['code'])){
     // );
 
     //微车联
-    $appData=array(
-        'wxAppKey'=>'wxa5c196f7ec4b5df9',
-        'wxAppSecret'=>'e89542d7376fc479aac35706305fc23f'
-    );
+    $appData=WX::payAppData();
 
     $code = $_GET['code'];
     $openid = getOpenid($code,$appData['wxAppKey'],$appData['wxAppSecret']);

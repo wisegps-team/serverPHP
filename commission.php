@@ -108,21 +108,23 @@ if(isset($_POST['oid'])){//支付成功之后
     pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$_SESSION['receipt']);
     echoExit('支付成功，请关闭本页面');
 }else if(isset($_GET['code'])){
-    //根据域名获取公众号信息
-    $_host=$_SERVER['HTTP_HOST'];//当前域名
-    //用于获取app数据
-    $appData=array(
-        'domainName' => $_host,
-        'method'=>'wicare.app.get',
-        'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
-    );
-    //获取app数据
-    $appRes=$API->start($appData);
+    // //根据域名获取公众号信息
+    // $_host=$_SERVER['HTTP_HOST'];//当前域名
+    // //用于获取app数据
+    // $appData=array(
+    //     'domainName' => $_host,
+    //     'method'=>'wicare.app.get',
+    //     'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
+    // );
+    // //获取app数据
+    // $appRes=$API->start($appData);
     
-    if(!$appRes||!$appRes['data']){
-        echoExit('微信appKey配置不对，无法下单');
-    }
-    $appData=$appRes['data'];
+    // if(!$appRes||!$appRes['data']){
+    //     echoExit('微信appKey配置不对，无法下单');
+    // }
+    // $appData=$appRes['data'];
+    //微车联
+    $appData=WX::payAppData();
 
     $code = $_GET['code'];
     $openid = getOpenid($code,$appData['wxAppKey'],$appData['wxAppSecret']);

@@ -43,7 +43,7 @@ class api_v2{
 		}
 		$url = str_replace('+','%2B', $url); 
 		if($p['method']!='wicare.cache.getObj'){
-			$str=$opt['app_secret'].$str.$opt['app_secret'];
+		 	$str=$opt['app_secret'].$str.$opt['app_secret'];
 		}
 		$sign=strtoupper(md5($str));
 		$url.="sign=".$sign;
@@ -92,6 +92,9 @@ class api_v2{
 			);
 		}
 		$url=$this->makeUrl($data,$opt);
+		// if($data['method']=='wicare.pay.weixin')
+		// 	file_put_contents('logs/wicare.pay.weixin',$url.'
+		// 	',FILE_APPEND);
 		$res=$this->sendHttp($url);
 		return json_decode(characet($res),true);
 	}
