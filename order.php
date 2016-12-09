@@ -183,7 +183,7 @@ if(isset($_GET['code'])){
 	</script>
 	<body>
 		<div class="mui-content">
-			<img src="./img/icon_activation.png" style="width:120px;margin-top: 2em;max-width: 25%;">
+			<img src="./autogps/img/icon_activation.png" style="width:120px;margin-top: 2em;max-width: 25%;">
 			<div style="color: #6D6D6D;margin-top: 10px;"><script>echo(order.title)</script></div>	
 			<div class="main">
 				<p id="money"><script>echo(order.price_int)</script><span style="font-size: 26px;" id="decimal"><script>echo(order.price_decimal)</script></span></p>
