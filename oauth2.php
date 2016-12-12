@@ -83,8 +83,9 @@ function getUserInfo($code,$appid,$appsecret){
 
 function sso_login($login_id){
     global $API,$opt;
+    $key=api_v2::getOpenIdKey();
     $custData=array(
-        'authData.openId' => $login_id,
+        'authData.'.$key => $login_id,
         'method'=>'wicare.user.sso_login'
     );
     return $API->start($custData,$opt);

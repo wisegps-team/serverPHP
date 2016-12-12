@@ -265,8 +265,9 @@ class wechatCallbackapiTest
         $device=$device['data'];
 
         //先尝试使用openId登录
+        $openIdKey=api_v2::getOpenIdKey();
         $user=$API->start(array(
-            'authData.openId' => $open_id,
+            'authData.'.$openIdKey => $open_id,
             'method'=>'wicare.user.sso_login'
         ),$opt);
         if(isset($user['access_token'])){//已经有账号
@@ -280,7 +281,7 @@ class wechatCallbackapiTest
             'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
         ),$opt);
         if(!$booking||!$booking['data'])
-            $content='设备IMEI：'.$did.'，<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'">请点击注册</a>';
+            $content='设备IMEI：'.$did.'，请点击<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'">注册</a>';
         else{
             //检查用户是否已注册
             $booking=$booking['data'];
@@ -301,7 +302,7 @@ class wechatCallbackapiTest
                     'mobile'=>$phone,
                     'password'=>md5(substr($phone,-6)),
                     'userType'=>7,
-                    'authData'=>array('openId'=>$open_id)
+                    'authData'=>array(''.$openIdKey=>$open_id)
                 ),$opt);
             }else{
                 $user=$user['data'];

@@ -8,6 +8,15 @@ class api_v2{
 	 	"sign_method"=>"md5"
 	);
 
+	//返回当前域名openId的key名,域名中的点符号“.”使用下划线“_”替换，并且在最后加上“_openId”
+	//例如 wx_autogps_cn_openId
+	//如果传递了$host参数，则使用该参数作为域名
+	public static function getOpenIdKey($host){
+		if(!$host)
+			$host=$_SERVER['HTTP_HOST'];
+		return str_replace('.','_',$host).'_openId';
+	}
+
 	function encode($str){
 		$type=gettype($str);
 		if($type=='array')

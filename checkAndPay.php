@@ -29,7 +29,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         return 0;
     }else{//给预订人发送微信推送
         if($booking['type']==1)
-            pfb::sendToBooker($wx,$wei,$booking);
+            pfb::sendToBooker($cid,$booking);
     }
 
     $cust=pfb::getCustomer($cid);//customer表记录
@@ -96,10 +96,11 @@ function checkAndPay($booking,$cid,$device,$payAll){
     }else{
         //获取推荐人
         pfb::addLog('获取推荐人');
-        
+
         $emp=pfb::getEmployee($booking['sellerId']);
         pfb::addLog('推荐人emp:'.json_encode($emp));
         if(!$emp){//错误
+            pfb::addLog('推荐人emp错误:'.json_encode($emp));
             return 2;
         }
         $e_user=pfb::getUser($emp['uid']);
@@ -117,7 +118,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
             'remark'=>$remark,
             'attach'=>pfb::getAttach($booking['objectId'],1,$emp['uid'])
         ),$opt);
-        pfb::addLog('佣金支付出错pay:'.json_encode($pay));
+        pfb::addLog('佣金支付返回pay:'.json_encode($pay));
         if($pay['status_code']){
             //支付出错
             if($pay['status_code']==8196){//余额不足，微信推送
@@ -309,7 +310,7 @@ class pfb{
     }
 
     //根据cid获取customer
-    public function getCustomer($cid){
+    public static function getCustomer($cid){
         global $opt,$API;
         $cust=$API->start(array(
             'method'=>'wicare.customer.get',
@@ -343,14 +344,21 @@ class pfb{
         }else{
             $user=$userOrUid;
         }
+        $key=api_v2::getOpenIdKey('wx.autogps.cn');//获取营销号的openid
         if(!$user||!$user['authData'])
             return false;
-        else
-            return $user['authData']['openId'];
+        else{
+            if($user['authData'][$key])
+                return $user['authData'][$key];
+            else{//没有营销号的openId，说明是获取推荐人而且推荐人是车主，所以需要服务号来推
+                $key=api_v2::getOpenIdKey('user.autogps.cn');
+                return $user['authData'][$key];
+            }
+        }
     }
 
     //获取公司公账号，传递customer
-    public function getPayUser($cust){
+    public static function getPayUser($cust){
         global $opt,$API;
         $uid=$cust['objectId'];
         $user=$API->start(array(
@@ -377,7 +385,7 @@ class pfb{
     }
 
     //扣除手续费
-    public function processingFee($amount){
+    public static function processingFee($amount){
         return $amount;
     }
 
@@ -390,12 +398,12 @@ class pfb{
     }
 
     //获取微信
-    public static function getWeixin($cid){
+    public static function getWeixin($cid,$type=1){
         global $opt,$API;
         $wei=$API->start(array(
             'method'=>'wicare.weixin.get',
             'uid'=>$cid,
-            'type'=>1,
+            'type'=>$type,
             'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template'
         ),$opt);
         if(!$wei['data']||!$wei['data']['wxAppKey']||!$wei['data']['wxAppSecret']){
@@ -499,7 +507,11 @@ class pfb{
     }
 
     //发送给预订人，车主已注册
-    public static function sendToBooker($wx,$wei,$booking){
+    public static function sendToBooker($cid,$booking){
+        $wei=pfb::getWeixin($cid,0);
+        if(!$wei)
+            return;
+        $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
         $tem=$wei['template']['OPENTM407674335'];
         $url='#';
         $openId=$booking['openId'];
@@ -552,14 +564,14 @@ class pfb{
      * $remark 推送的备注,$booking_id 预订单的id,
      * $amount 可选，预订时预付款的金额
      */
-    public function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount=0){
+    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount=0){
         global $API,$opt;
         pfb::addLog('commissionSuccess:发送余额变动');
         $emp_openId=pfb::getOpenId($e_user);
         $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,(0-$commission),'佣金支出',$remark);//发送给商户
         pfb::addLog('佣金支出'.json_encode($_r));
-        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,'佣金到帐',$remark);//发送给推荐人
-        pfb::addLog('佣金到帐'.json_encode($_r));
+
+        
         //更新预订表信息
         $b=array(
             'method'=>'wicare.booking.update',
@@ -572,18 +584,27 @@ class pfb{
         if($amount)
             $b['receipt']=$amount;
         $pay=$API->start($b,$opt);
-        pfb::addLog('更新预订信息:已发送余额变动'.json_encode($pay));
+        pfb::addLog('更新预订信息'.json_encode($pay));
+
+        if($e_user['userType']==7){//是车主的话，获取服务号进行推送
+            $wei=pfb::getWeixin($cid,0);
+            if(!$wei)
+                return;
+            $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+        }
+        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,'佣金到帐',$remark);//发送给推荐人
+        pfb::addLog('佣金到帐'.json_encode($_r));
     }
 
     //根据营销人员id去获取营销人员信息
-    public function getEmployee($sid){
+    public static function getEmployee($sid){
         global $API,$opt;
         $emp=$API->start(array(
             'method'=>'wicare.employee.get',
             'objectId'=>$sid,
             'fields'=>'uid,companyId'
         ),$opt);
-        if(pfb::dataNull($emp)){//并不是员工，
+        if(pfb::dataNull($emp)){//并不是员工，有可能是商户管理员，有可能是车主
             $emp=$API->start(array(
                 'method'=>'wicare.customer.get',
                 'objectId'=>$sid,
@@ -596,7 +617,7 @@ class pfb{
     }
 
     //添加日志
-    public function addLog($content){
+    public static function addLog($content){
         $log_filename = "aa_pay_log.txt";
         $content.='------'.date("Y-m-d H:i:s").'
         ';
