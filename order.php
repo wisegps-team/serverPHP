@@ -203,11 +203,11 @@ if(isset($_GET['code'])){
                 location=_g.callback;
             else
                 history.back(-2);//跳回授权之前的页
-		} else if(res.err_msg == "get_brand_wcpay_request：cancel"){
+		} else if(res.err_msg == "get_brand_wcpay_request:cancel"){
 			pay.canPay=false;
 			document.getElementById("pay").innerText="确认支付";
 		}else{
-			alert(JSON.stringify(res)+"；订单号为："+pay_args.package);
+			alert("支付失败；订单信息:"+JSON.stringify(res));
 		}
 	}
 	
