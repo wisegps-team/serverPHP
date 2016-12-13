@@ -19,7 +19,8 @@ $API=new api_v2();//api接口类
 //参数说明，$booking订单对象，$cid公司id，$device带营销产品参数的对象，$payAll标识是否进行预付款到账
 function checkAndPay($booking,$cid,$device,$payAll){
     global $opt,$API;
-    $wei=pfb::getWeixin($cid);
+    $sid=$device['serverId'];//微信公众号提供者
+    $wei=pfb::getWeixin($sid);
     pfb::addLog('商户微信wei:'.$wei['wxAppKey'].'返回这个'.$wei['wxAppSecret']);
     if(!$wei){
         return 3;
@@ -29,7 +30,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         return 0;
     }else{//给预订人发送微信推送
         if($booking['type']==1)
-            pfb::sendToBooker($cid,$booking);
+            pfb::sendToBooker($sid,$booking);
     }
 
     $cust=pfb::getCustomer($cid);//customer表记录
@@ -41,6 +42,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
     $cust_openId=pfb::getOpenId($user);//商户管理员的openId
     $bill_type='预付款到账';
     $err_remark='请联系技术人员处理';
+    $amount=0;
 
     if($payAll)
         pfb::addLog('payAll&&booking[payMoney]:'.$booking['payMoney']);
@@ -159,7 +161,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         }
 
         //支付成功，发送两条余额变动
-        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking['objectId'],$amount);
+        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking['objectId'],$amount,$sid);
         return 0;
     }
 }
@@ -564,7 +566,7 @@ class pfb{
      * $remark 推送的备注,$booking_id 预订单的id,
      * $amount 可选，预订时预付款的金额
      */
-    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount=0){
+    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount,$sid){
         global $API,$opt;
         pfb::addLog('commissionSuccess:发送余额变动');
         $emp_openId=pfb::getOpenId($e_user);
@@ -587,7 +589,7 @@ class pfb{
         pfb::addLog('更新预订信息'.json_encode($pay));
 
         if($e_user['userType']==7){//是车主的话，获取服务号进行推送
-            $wei=pfb::getWeixin($cid,0);
+            $wei=pfb::getWeixin($sid,0);
             if(!$wei)
                 return;
             $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
