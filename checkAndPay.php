@@ -177,6 +177,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
     global $opt,$API;
     $cid=$device['uid'];//设备原拥有者，商户id
     $did=$device['did'];
+    $sid=$booking['uid'];//活动创建商户id
     
     $car=$API->start(array(//添加车辆
         'method'=>'wicare.vehicle.create',
@@ -206,7 +207,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
     if($booking){
         $dev=$API->start(array(//活动产品表获取设备安装费用的信息
             'method'=>'wicare.activityProduct.get',
-            'uid'=>$cid,
+            'uid'=>$sid,
             'productId'=>$device['modelId'],
             'fields'=>'objectId,uid,price,installationFee,reward,name,productId,brandId,brand'
         ),$opt);
@@ -388,6 +389,7 @@ class pfb{
 
     //扣除手续费
     public static function processingFee($amount){
+        // $a=floor($amount*100*0.994)/100;//扣除0.6%的手续费
         return $amount;
     }
 
@@ -474,6 +476,10 @@ class pfb{
 
     //发送余额变动通知
     public static function sendBalanceChange($wx,$wei,$openId,&$user,$amount,$title,$remark=''){
+        if($amount==0)return array(
+            "errcode"=>0,
+            "errmsg"=>"金额为0，不进行推送"
+        );
         $tem=$wei['template']['OPENTM405774153'];
         $url='#';
         $date=date("Y-m-d H:i:s");
