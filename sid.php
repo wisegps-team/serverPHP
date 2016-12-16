@@ -39,8 +39,7 @@ $serviceData=array(
 //获取app数据
 $appRes=$API->start($appData);
 $appRes=err_exit($appRes);
-if(isset($_GET['wxAppKey']))//如果有指定微信appkey，则替换
-	$appRes['wxAppKey']=$_GET['wxAppKey'];
+
 $key=md5($appRes['objectId'].time());
 if(!$appRes['sid']){
 	echo 'Not configured service';
