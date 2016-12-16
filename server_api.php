@@ -146,6 +146,7 @@ function getInstallByUid(){
 		'method'=>'wicare.customer.list',
 		'parentId'=>$_GET['uid'],
 		'isInstall'=>1,
+		'limit'=>-1,
 		'fields'=>'createdAt,objectId,uid,name,treePath,parentId,tel,custTypeId,custType,province,provinceId,city,cityId,area,areaId,address,contact,logo,sex,dealer_id,other,isInstall,serverId,wxAppKey'
 	);
 	echo json_encode($API->start($data,$opt));
@@ -168,8 +169,8 @@ function getUserOpenId(){
 //设置微信推送模板
 function setWxTemplate(){
 	global $opt,$API;
-				//预订成功通知      服务预约成功通知   账户余额变动提醒   待支付提醒		  账单异常处理提醒
-	$temp=array('OPENTM407674335','OPENTM405760757','OPENTM405774153','OPENTM406963151','OPENTM401266811');
+				//预订成功通知      服务预约成功通知   安装成功通知       账户变动提醒       提现通知	          待支付提醒         账单异常处理提醒
+	$temp=array('OPENTM408168978','OPENTM405760757','OPENTM408183089','OPENTM207664902','OPENTM207428984','OPENTM406963151','OPENTM401266811');
 	$arrlength=count($temp);
 	$wei=getWeixin();
 	$wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);

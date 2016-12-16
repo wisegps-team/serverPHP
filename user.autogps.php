@@ -211,19 +211,15 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'objectId'=>$booking_id,
             'status'=>0,
-            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,orderId,payMoney'
+            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,orderId,payMoney,product'
         ),$opt);
         if(!$booking['data'])
             return '无预订信息';
         if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id)//为自己预订且不是车主
             return '感谢关注';
+        $product=$booking['data']['product'];
 
-        $remark='';
-        if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
-            $remark='请分享此二维码给'.$booking['data']['userName'].'（车主）以便其获取授权安装网点信息。<a href="'.$booking['data']['carType']['qrUrl'].'">【二维码】</a>';
-        }
-
-        $activity=$API->start(array(//获取预订信息
+        $activity=$API->start(array(//获取活动信息
             'method'=>'wicare.activity.get',
             'objectId'=>$booking['data']['activityId'],
             'fields'=>'name,price,installationFee,deposit,product'
@@ -233,19 +229,66 @@ class wechatCallbackapiTest
         $pay='未预付';
         if($booking['data']['payStatus']){
             if($booking['data']['payStatus']==1)
-                $pay='订金：'.$booking['data']['payMoney'];
+                $pay='订金 '.round($booking['data']['payMoney'],2);
             else if($booking['data']['payStatus']==2)
-                $pay='全款+安装费：'.$booking['data']['payMoney'];
+                $pay='设备款 '.round($booking['data']['product']['price'],2).'，安装费 '.round($booking['data']['product']['installationFee'],2);
         }
         $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
-        return  $activity['data']['name'].'
-预订时间：'.date("Y-m-d H:i",strtotime($booking['data']['createdAt'])).'
-预订人：'.$booking['data']['name'].'/'.$booking['data']['mobile'].'
-客户：'.$booking['data']['userName'].'/'.$booking['data']['userMobile'].'
-产品型号：'.$activity['data']['product'].'/'.$activity['data']['price'].'元（安装费用：'.$activity['data']['installationFee'].'）
+
+        $remark='点击详情选择授权安装网点';
+        if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
+            $remark='点击详情打开页面后发送给'.$booking['data']['userName'].'选择授权安装网点信息';
+            $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['data']['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['data']['name']).'&userName='.urlencode($booking['data']['userName']);
+        }
+
+        $date=date("Y-m-d H:i",strtotime($booking['data']['createdAt']));
+        $user=$booking['data']['userName'].'/'.$booking['data']['userMobile'];
+        $p=$activity['data']['product'].'/￥'.round($product['price'],2);
+        $_spare='订单ID：'.$booking['data']['objectId'].'
+预订时间：'.$date.'
+预订产品：'.$p.'
+预付款项：'.$pay.'
+车主信息：'.$user.'
 预付款：'.$pay.'
-<a href="'.$in_url.'">请点击进入选择安装网点</a>
-'.$remark;
+'.$remark.'
+<a href="'.$in_url.'">详情</a>';
+        $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
+        if(!$wei){
+            return $_spare;
+        }
+        $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+        $res=$wx->sendWeixin($openId,$tem,'
+        {
+            "first": {
+                "value": "订单ID：'.$booking['data']['objectId'].'",
+                "color": "#173177"
+            },
+            "keyword1": {
+                "value": "'.$date.'",
+                "color": "#173177"
+            },
+            "keyword2": {
+                "value": "'.$p.'",
+                "color": "#173177"
+            },
+            "keyword3": {
+                "value": "'.$pay.'",
+                "color": "#173177"
+            },
+            "keyword4": {
+                "value": "'.$user.'",
+                "color": "#173177"
+            },
+            "remark": {
+                "value": "'.$remark.'",
+                "color": "#173177"
+            }
+        }',$in_url);
+        $res=json_decode($res,true);
+        if($res['errcode'])//如果出错则推送文字
+            return $_spare;
+        else
+            return '';
     }
 
     private function register($did,$open_id){

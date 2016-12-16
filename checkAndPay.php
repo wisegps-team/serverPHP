@@ -404,12 +404,19 @@ class pfb{
     //获取微信
     public static function getWeixin($cid,$type=1){
         global $opt,$API;
-        $wei=$API->start(array(
-            'method'=>'wicare.weixin.get',
-            'uid'=>$cid,
-            'type'=>$type,
-            'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template'
-        ),$opt);
+        $data=array(
+                'method'=>'wicare.weixin.get',
+                'uid'=>$cid,
+                'type'=>$type,
+                'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template'
+            );
+        if($type<0)
+            $data['wxAppKey']=$cid;
+        else{
+            $data['uid']=$cid;
+            $data['type']=$type;
+        }
+        $wei=$API->start($data,$opt);
         if(!$wei['data']||!$wei['data']['wxAppKey']||!$wei['data']['wxAppSecret']){
             return false;
         }
