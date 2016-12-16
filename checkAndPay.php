@@ -406,8 +406,6 @@ class pfb{
         global $opt,$API;
         $data=array(
                 'method'=>'wicare.weixin.get',
-                'uid'=>$cid,
-                'type'=>$type,
                 'fields'=>'wxAppKey,wxAppSecret,uid,type,objectId,name,template'
             );
         if($type<0)
