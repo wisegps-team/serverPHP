@@ -276,9 +276,9 @@ function setMenu(){
 	if($wei['type']==1){
 		echoExit(0,'');
 	}
-	$reg='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
-	$my='http://user.autogps.cn/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
-	$home='http://user.autogps.cn/?wx_app_id='.$_GET['wxAppKey'];
+	$reg='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
+	$my='http://'.api_v2::$domain['user'].'/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
+	$home='http://'.api_v2::$domain['user'].'/?wx_app_id='.$_GET['wxAppKey'];
 
 	if(isset($wei['menu'])&&!isset($wei['menu']['none']))
 		$menu=unicodeJson($wei['menu']).',';

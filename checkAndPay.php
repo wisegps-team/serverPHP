@@ -26,12 +26,9 @@ function checkAndPay($booking,$cid,$device,$payAll){
         return 3;
     }
     $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
-    if(!$booking){
-        return 0;
-    }else{//给预订人发送微信推送
-        if($booking['type']==1)
-            pfb::sendToBooker($sid,$booking);
-    }
+    //给预订人发送微信推送
+    if($booking['type']==1)
+        pfb::sendToBooker($sid,$booking,$device);
 
     $cust=pfb::getCustomer($cid);//customer表记录
     pfb::addLog('商户信息cust:'.json_encode($cust));
@@ -70,11 +67,11 @@ function checkAndPay($booking,$cid,$device,$payAll){
                 //已支付并且未转入商户，则扣除手续费后转到商户余额
                 pfb::addLog('已支付并且未转入商户，则扣除手续费后转到商户余额');
                 $amount=pfb::processingFee($order['amount']);
-                $remark=$booking['userName'].'/'.$booking['userMobile'].'预付款(扣除手续费)';
+                $remark='IMEI：'.$device['did'].'货款';
                 pfb::payToCust($pay_user['objectId'],$amount,$remark,pfb::getAttach($booking['objectId']));
                 pfb::addLog('已转到商户余额');
                 //发送余额变动通知
-                $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$amount,$bill_type,$remark);
+                $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$amount,$cust['name'],$remark);
                 pfb::addLog('发送余额变动通知'.json_encode($_r));
             }else{
                 pfb::addLog('预订订单到账失败');
@@ -126,7 +123,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
             if($pay['status_code']==8196){//余额不足，微信推送
                 $appData=WX::payAppData();
                 $tem=$wei['template']['OPENTM406963151'];
-                $_url='http://user.autogps.cn/commission.php/?bookingId='.$booking['objectId'].'&cid='.$cid.'&receipt='.$amount.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark);
+                $_url='http://'.api_v2::$domain['user'].'/commission.php/?bookingId='.$booking['objectId'].'&cid='.$cid.'&receipt='.$amount.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark);
                 $url="https://open.weixin.qq.com/connect/oauth2/authorize?appid=".$appData['wxAppKey']."&redirect_uri=".rawurlencode($_url)."&response_type=code&scope=snsapi_base&state=state#wechat_redirect";
                 pfb::addLog('$cust_openId:'.$cust_openId);
 	            $_res=$wx->sendWeixin($cust_openId,$tem,'
@@ -226,7 +223,6 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
             'status1'=>1,
             'resTime'=>date("Y-m-d H:i:s"),
             'did'=>$did,
-            'userOpenId'=>$open_id,
             'res.openId'=>$open_id,
             'res.mobile'=>$phone,
             'res.name'=>$name,
@@ -290,7 +286,7 @@ function addDeviceLog($device,$uid,$name,$booking){
     //给下一级添加入库信息
     $API->start($pushLog,$opt);
     
-    checkAndPay($booking,$cid,$device,true);
+    return checkAndPay($booking,$cid,$device,true);
 }
 
 //pay for booking
@@ -347,14 +343,14 @@ class pfb{
         }else{
             $user=$userOrUid;
         }
-        $key=api_v2::getOpenIdKey('wx.autogps.cn');//获取营销号的openid
+        $key=api_v2::getOpenIdKey(api_v2::$domain['wx']);//获取营销号的openid
         if(!$user||!$user['authData'])
             return false;
         else{
             if($user['authData'][$key])
                 return $user['authData'][$key];
             else{//没有营销号的openId，说明是获取推荐人而且推荐人是车主，所以需要服务号来推
-                $key=api_v2::getOpenIdKey('user.autogps.cn');
+                $key=api_v2::getOpenIdKey(api_v2::$domain['user']);
                 return $user['authData'][$key];
             }
         }
@@ -485,10 +481,12 @@ class pfb{
             "errcode"=>0,
             "errmsg"=>"金额为0，不进行推送"
         );
-        $tem=$wei['template']['OPENTM405774153'];
+        $tem=$wei['template']['OPENTM207664902'];
         $url='#';
         $date=date("Y-m-d H:i:s");
         $user['balance']=$user['balance']+$amount;
+        $type='入账';
+        if($amount<0)$type='出账';
 
         return $wx->sendWeixin($openId,$tem,'
         {
@@ -497,19 +495,15 @@ class pfb{
                 "color": "#173177"
             },
             "keyword1": {
-                "value": "'.$amount.'元",
+                "value": "'.$date.'",
                 "color": "#173177"
             },
             "keyword2": {
-                "value": "'.$user['frozenBalance'].'元",
+                "value": "'.$type.'",
                 "color": "#173177"
             },
             "keyword3": {
-                "value": "'.$user['balance'].'元",
-                "color": "#173177"
-            },
-            "keyword4": {
-                "value": "'.$date.'",
+                "value": "'.number_format($amount,2).'",
                 "color": "#173177"
             },
             "remark": {
@@ -520,46 +514,34 @@ class pfb{
     }
 
     //发送给预订人，车主已注册
-    public static function sendToBooker($cid,$booking){
+    public static function sendToBooker($cid,$booking,$device){
         $wei=pfb::getWeixin($cid,0);
         if(!$wei)
             return;
         $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
-        $tem=$wei['template']['OPENTM407674335'];
+        $tem=$wei['template']['OPENTM408183089'];
         $url='#';
         $openId=$booking['openId'];
-        $date=date("m月d日 H时i分");
-        $title=$booking['userName'].'已注册';
-        $remark='您订单号码为'.$booking['objectId'].'的业务于'.$date.'已安装注册，车主为'.$booking['userName'].'，车主手机号码为'.$booking['userMobile'];
-        $date=date("Y-m-d H:i:s");
-        $booker=$booking['name'];
+
+        $date=date("Y-m-d H:i");
         $user=$booking['userName'].'/'.$booking['userMobile'];
-        $product=$booking['product']['name'];
-        $pay=$booking['payMoney'];
-        return $wx->sendWeixin($openId,$tem,'
+        $remark='车主信息：'.$user.'\\n注册时间：'.$date;
+        return $res=$wx->sendWeixin($openId,$tem,'
         {
             "first": {
-                "value": "'.$title.'",
+                "value": "",
                 "color": "#173177"
             },
             "keyword1": {
-                "value": "'.$date.'",
+                "value": "'.$cust['name'].'",
                 "color": "#173177"
             },
             "keyword2": {
-                "value": "'.$booker.'",
+                "value": "'.$device['model'].'",
                 "color": "#173177"
             },
             "keyword3": {
-                "value": "'.$user.'",
-                "color": "#173177"
-            },
-            "keyword4": {
-                "value": "'.$product.'",
-                "color": "#173177"
-            },
-            "keyword5": {
-                "value": "'.$pay.'",
+                "value": "'.$device['did'].'",
                 "color": "#173177"
             },
             "remark": {
@@ -592,7 +574,8 @@ class pfb{
             'commission'=>$commission,
             'payTime'=>date("Y-m-d H:i:s"),
             'status'=>2,
-            'status2'=>1
+            'status2'=>1,
+            'status1'=>1
         );
         if($amount)
             $b['receipt']=$amount;

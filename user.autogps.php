@@ -108,53 +108,6 @@ class wechatCallbackapiTest
         switch($object->Event){
             case "subscribe"://未关注扫描二维码
                 $content = "欢迎您进入WiCARE车联网世界。";
-                $reg='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
-                $my='http://user.autogps.cn/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
-                $home='http://user.autogps.cn/?wx_app_id='.$_GET['wxAppKey'];
-
-                $wei=$API->start(array(
-                    'method'=>'wicare.weixin.get',
-                    'wxAppKey'=>$_GET['wxAppKey'],
-                    'fields'=>'menu'
-                ),$opt);
-                if($wei['data']&&$wei['data']['menu'])
-                    $menu=json_encode($wei['data']['menu']).',';
-                else
-                    $menu='';
-                // 设置菜单
-                $jsonmenu = '{
-                    "button": [
-                        {
-                            "type": "view",
-                            "name": "我的主页",
-                            "url": "'.$home.'"
-                        },
-                        '.$menu.'
-                        {
-                            "name": "更多",
-                            "sub_button": [
-                                {
-                                    "type": "view",
-                                    "name": "注册",
-                                    "url": "'.$reg.'"
-                                },
-                                {
-                                    "type": "view",
-                                    "name": "我的账号",
-                                    "url": "'.$my.'"
-                                },
-                                {
-                                    "type": "view",
-                                    "name": "车主推荐",
-                                    "url": "#"
-                                }
-                            ]
-                        }
-                    ]
-                }';
-                $acess = getAccessToken();
-                $url = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" . $acess;
-                $result = httpPost($url, $jsonmenu);
 
                 if(isset($object->EventKey)){//扫描带参数的二维码关注的
                     $scene=substr($object->EventKey,8);
@@ -236,12 +189,12 @@ class wechatCallbackapiTest
         //     else if($booking['data']['payStatus']==2)
         //         $pay='设备款 '.number_format($booking['data']['product']['price'],2).'，安装费 '.number_format($booking['data']['product']['installationFee'],2);
         // }
-        $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
+        $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
 
         $remark='点击详情选择授权安装网点';
         if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
             $remark='点击详情打开页面后发送给'.$booking['data']['userName'].'选择授权安装网点';
-            $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['data']['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['data']['name']).'&userName='.urlencode($booking['data']['userName']);
+            $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['data']['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['data']['name']).'&userName='.urlencode($booking['data']['userName']);
         }
 
         $date=date("Y-m-d H:i",strtotime($booking['data']['createdAt']));
@@ -337,7 +290,7 @@ class wechatCallbackapiTest
             'status'=>0,
             'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,install,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
         ),$opt);
-        $link='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'&openid='.$open_id;//注册链接
+        $link='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'&openid='.$open_id;//注册链接
         $remark='点击详情继续注册';
         if($booking&&$booking['data']){
             $booking=$booking['data'];
