@@ -226,24 +226,27 @@ class wechatCallbackapiTest
         ),$opt);
         if(!$activity['data'])
             return '无活动信息';
-        $pay='未预付';
-        if($booking['data']['payStatus']){
-            if($booking['data']['payStatus']==1)
-                $pay='订金 '.round($booking['data']['payMoney'],2);
-            else if($booking['data']['payStatus']==2)
-                $pay='设备款 '.round($booking['data']['product']['price'],2).'，安装费 '.round($booking['data']['product']['installationFee'],2);
-        }
+        if($booking['data']['payMoney']!=0)
+            $pay=number_format($booking['data']['payMoney'],2);
+        else
+            $pay='0.00';
+        // if($booking['data']['payStatus']){
+        //     if($booking['data']['payStatus']==1)
+        //         $pay='订金 '.number_format($booking['data']['payMoney'],2);
+        //     else if($booking['data']['payStatus']==2)
+        //         $pay='设备款 '.number_format($booking['data']['product']['price'],2).'，安装费 '.number_format($booking['data']['product']['installationFee'],2);
+        // }
         $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
 
         $remark='点击详情选择授权安装网点';
         if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
-            $remark='点击详情打开页面后发送给'.$booking['data']['userName'].'选择授权安装网点信息';
+            $remark='点击详情打开页面后发送给'.$booking['data']['userName'].'选择授权安装网点';
             $in_url='http://user.autogps.cn/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['data']['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['data']['name']).'&userName='.urlencode($booking['data']['userName']);
         }
 
         $date=date("Y-m-d H:i",strtotime($booking['data']['createdAt']));
         $user=$booking['data']['userName'].'/'.$booking['data']['userMobile'];
-        $p=$activity['data']['product'].'/￥'.round($product['price'],2);
+        $p=$activity['data']['product'].'/￥'.number_format($product['price'],2);
         $_spare='订单ID：'.$booking['data']['objectId'].'
 预订时间：'.$date.'
 预订产品：'.$p.'
@@ -257,7 +260,8 @@ class wechatCallbackapiTest
             return $_spare;
         }
         $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
-        $res=$wx->sendWeixin($openId,$tem,'
+        $tem=$wei['template']['OPENTM408168978'];
+        $res=$wx->sendWeixin($open_id,$tem,'
         {
             "first": {
                 "value": "订单ID：'.$booking['data']['objectId'].'",
@@ -293,7 +297,7 @@ class wechatCallbackapiTest
 
     private function register($did,$open_id){
         global $opt,$API,$longTimeTask;
-
+        $content='';
         $device=$API->start(array(//验证设备
             'method'=>'wicare._iotDevice.get',
             'did'=>$did,
@@ -306,6 +310,16 @@ class wechatCallbackapiTest
             return '设备已被绑定';
         }
         $device=$device['data'];
+
+        $cust=$API->start(array(//获取当前拥有者
+            'method'=>'wicare.customer.get',
+            'objectId'=>$device['uid'],
+            'fields'=>'objectId,name,tel'
+        ),$opt);
+        if(!$cust||!isset($cust['data'])||$cust['data']['custTypeId']==7){
+            return '未查找到设备拥有者';
+        }
+        $cust=$cust['data'];
 
         //先尝试使用openId登录
         $openIdKey=api_v2::getOpenIdKey();
@@ -321,74 +335,44 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'userOpenId'=>$open_id,
             'status'=>0,
-            'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
+            'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,install,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
         ),$opt);
-        if(!$booking||!$booking['data'])
-            $content='设备IMEI：'.$did.'，请点击<a href="http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'">注册</a>';
-        else{
-            //检查用户是否已注册
+        $link='http://user.autogps.cn/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'&openid='.$open_id;//注册链接
+        $remark='点击详情继续注册';
+        if($booking&&$booking['data']){
             $booking=$booking['data'];
-            $phone=$booking['userMobile'];
-            $name=$booking['userName'];
-            if(!$phone){
-                $phone=$booking['mobile'];
-                $name=$booking['name'];
-            }
-            $user=$API->start(array(//查找一下是否已注册
-                'method'=>'wicare.user.get',
-                'mobile'=>$phone,
-                'fields'=>'objectId,mobile,authData'
-            ),$opt);
-            if(!$user||!$user['data']){
-                $user=$API->start(array(//添加用户表
-                    'method'=>'wicare.user.create',
-                    'mobile'=>$phone,
-                    'password'=>md5(substr($phone,-6)),
-                    'userType'=>7,
-                    'authData'=>array(''.$openIdKey=>$open_id)
-                ),$opt);
-            }else{
-                $user=$user['data'];
-            }
-            $cust=$API->start(array(
-                'method'=>'wicare.customer.get',
-                'uid'=>$user['objectId'],
-                'fields'=>'objectId,tel'
-            ),$opt);
-            if(isset($cust['data'])){//已经有账号
-                return '您已注册，请进入系统进行设备绑定';
-            }
-            
-            $cust=$API->start(array(//添加客户表
-                'method'=>'wicare.customer.create',
-                'tel'=>$phone,
-                'name'=>$name,
-                'parentId'=>array($device['uid']),
-                'uid'=>$user['objectId'],
-                'userType'=>7,
-                'custType'=>'私家车主',
-                'contact'=>$name
-            ),$opt);
-
-            //添加车辆绑定设备
-            $device=addAndBind($cust['objectId'],'默认车牌',$device,$open_id,$phone,$name,$booking);
-
-            //保存一个匿名方法，把响应返回给微信之后调用
-            $i=count($longTimeTask);
-            $longTimeTask[$i]=function() use($device,$did,$cust,$booking,$phone){
-                global $opt,$API,$papi;
-                $p_user=json_decode($papi->register(array(
-                    'phone'=>$phone,
-                    'pswd'=>substr($phone,-6),
-                    'imei'=>$did
-                )),true);
-                if($p_user['error']){
-                    $error='注册失败，'.$p_user['errormsg'];
-                }
-                addDeviceLog($device,$cust['objectId'],$booking['name'],$booking);
-            };
-            $content='注册成功';
+            $link=$link.'&bookingId='.$booking['objectId'];
         }
+        
+        $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
+        if(!$wei){
+            return $content;
+        }
+        $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+        $tem=$wei['template']['OPENTM408183089'];
+        $res=$wx->sendWeixin($open_id,$tem,'
+        {
+            "first": {
+                "value": "",
+                "color": "#173177"
+            },
+            "keyword1": {
+                "value": "'.$cust['name'].'",
+                "color": "#173177"
+            },
+            "keyword2": {
+                "value": "'.$device['model'].'",
+                "color": "#173177"
+            },
+            "keyword3": {
+                "value": "'.$did.'",
+                "color": "#173177"
+            },
+            "remark": {
+                "value": "'.$remark.'",
+                "color": "#173177"
+            }
+        }',$link);
         return $content;
     }
 

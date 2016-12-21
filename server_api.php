@@ -239,7 +239,7 @@ function addAndBindCar(){
 	$device=$API->start(array(//验证设备
 		'method'=>'wicare._iotDevice.get',
 		'did'=>$did,
-		'fields'=>'objectId,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
+		'fields'=>'objectId,did,uid,model,modelId,binded,bindDate,vehicleName,vehicleId,serverId'
 	),$opt);
 	if(!$device||!isset($device['data'])){
 		echoExit(123,'未查找到设备');
@@ -253,21 +253,21 @@ function addAndBindCar(){
 		'method'=>'wicare.booking.get',
 		'userMobile'=>$phone,
 		'status'=>0,
-		'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
+		'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,install,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
 	),$opt);
 	if(!$booking||!$booking['data'])
 		$booking=null;
 	else
 		$booking=$booking['data'];
 	//添加车辆绑定设备
-	$device=addAndBind($uid,'默认车牌',$device,$open_id,$phone,$name);
+	$device=addAndBind($uid,'默认车牌',$device,$open_id,$phone,$name,$booking);
 	if(!is_array($device)){
 		echo '{"status_code":"'.$device.'"}';
 	}
 
-	echo '{"status_code":0}';
 	//添加出入库记录
 	addDeviceLog($device,$uid,$booking['name'],$booking);
+	echo '{"status_code":0}';
 }
 
 //给指定微信号设置车主菜单

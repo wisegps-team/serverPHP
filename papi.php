@@ -34,6 +34,9 @@ switch ($_GET["method"]){
 	case "postdata":
 		echo postData();
 		break;
+	case "deviceunbind":
+		echo $a->deviceUnbind($_POST);
+		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
 		exit;
