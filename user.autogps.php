@@ -159,7 +159,7 @@ class wechatCallbackapiTest
     }
 
     private function booking($booking_id,$open_id){
-        global $opt,$API;
+        global $opt,$API,$longTimeTask;
         $booking=$API->start(array(//获取预订信息
             'method'=>'wicare.booking.get',
             'objectId'=>$booking_id,
@@ -193,13 +193,14 @@ class wechatCallbackapiTest
 
         $remark='点击详情选择授权安装网点';
         if($booking['data']['type']==1&&$booking['data']['openId']==$open_id){//为他人预订
-            $remark='点击详情打开页面后发送给'.$booking['data']['userName'].'选择授权安装网点';
+            $remark='点击详情并按提示发送给好友';
             $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['data']['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['data']['name']).'&userName='.urlencode($booking['data']['userName']);
         }
 
         $date=date("Y-m-d H:i",strtotime($booking['data']['createdAt']));
         $user=$booking['data']['userName'].'/'.$booking['data']['userMobile'];
         $p=$activity['data']['product'].'/￥'.number_format($product['price'],2);
+        $title='订单ID：'.$booking['data']['objectId'];
         $_spare='订单ID：'.$booking['data']['objectId'].'
 预订时间：'.$date.'
 预订产品：'.$p.'
@@ -209,38 +210,49 @@ class wechatCallbackapiTest
 '.$remark.'
 <a href="'.$in_url.'">详情</a>';
         $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
+        //保存一个匿名方法，把响应返回给微信之后调用
+        //发送推送给营销人员，或者是车主（推荐有礼）
+        $longTimeTask[count($longTimeTask)]=function() use($wei,$title,$date,$p,$pay,$user,$booking){
+            global $opt,$API;
+            $r=$API->start(array(
+                'method'=>'wicare.booking.update',
+                '_objectId'=>$booking['objectId'],
+                'carType.qrStatus'=>'1'
+            ),$opt);
+            if($r['status_code']&&$r['status_code']!=0){
+                pfb::addLog('预订'.$booking['objectId'].'更新qrStatus出错：'.$r['status_code']);
+            }
+            $emp=$API->start(array(//获取人员信息
+                'method'=>'wicare.employee.get',
+                'objectId'=>$booking['sellerId'],
+                'fields'=>'uid,name,objectId,companyId'
+            ),$opt);
+            if($emp&&$emp['data']){//推荐人是一个员工
+                $uid=$emp['data']['uid'];
+                $wei=pfb::getWeixin($emp['data']['companyId']);
+                if(!$wei)return;
+                $open_id=pfb::getOpenId($uid);
+            }else{//车主或者管理员
+                $cust=$API->start(array(//获取人员信息
+                    'method'=>'wicare.customer.get',
+                    'objectId'=>$booking['sellerId'],
+                    'fields'=>'uid,name,objectId,custTypeId'
+                ),$opt);
+                if(!$cust||!$cust['data'])return;
+                if($cust['data']['custTypeId']!=7){//不是车主
+                    $wei=pfb::getWeixin($cust['data']['objectId']);
+                    if(!$wei)return;
+                    $uid=$emp['data']['uid'];
+                    $open_id=pfb::getOpenId($uid);
+                }
+            }
+            $remark='车主信息：'.$booking['data']['name'].'/'.$booking['data']['mobile'];
+            sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,'#');
+        };
         if(!$wei){
             return $_spare;
         }
-        $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
-        $tem=$wei['template']['OPENTM408168978'];
-        $res=$wx->sendWeixin($open_id,$tem,'
-        {
-            "first": {
-                "value": "订单ID：'.$booking['data']['objectId'].'",
-                "color": "#173177"
-            },
-            "keyword1": {
-                "value": "'.$date.'",
-                "color": "#173177"
-            },
-            "keyword2": {
-                "value": "'.$p.'",
-                "color": "#173177"
-            },
-            "keyword3": {
-                "value": "'.$pay.'",
-                "color": "#173177"
-            },
-            "keyword4": {
-                "value": "'.$user.'",
-                "color": "#173177"
-            },
-            "remark": {
-                "value": "'.$remark.'",
-                "color": "#173177"
-            }
-        }',$in_url);
+        sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url);
         $res=json_decode($res,true);
         if($res['errcode'])//如果出错则推送文字
             return $_spare;
@@ -371,7 +383,8 @@ class wechatCallbackapiTest
 							<FuncFlag>0</FuncFlag>
 							</xml>";
         $result = sprintf($textTpl, $object->FromUserName, $object->ToUserName, time(), $content);
-
+        if(!$content||$content==""||!isset($content))
+            $result='';
         return $result;
     }
 
@@ -479,4 +492,35 @@ function doLongTimeTask(){
 	}
 }
 
+function sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url){
+    $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+    $tem=$wei['template']['OPENTM408168978'];
+    $res=$wx->sendWeixin($open_id,$tem,'
+    {
+        "first": {
+            "value": "'.$title.'",
+            "color": "#173177"
+        },
+        "keyword1": {
+            "value": "'.$date.'",
+            "color": "#173177"
+        },
+        "keyword2": {
+            "value": "'.$p.'",
+            "color": "#173177"
+        },
+        "keyword3": {
+            "value": "'.$pay.'",
+            "color": "#173177"
+        },
+        "keyword4": {
+            "value": "'.$user.'",
+            "color": "#173177"
+        },
+        "remark": {
+            "value": "'.$remark.'",
+            "color": "#173177"
+        }
+    }',$in_url);
+}
 ?>
