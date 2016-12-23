@@ -1,7 +1,7 @@
 <?php
 /****api类****/
 class api_v2{
-	const api_url="http://wop-api.chease.cn/router/rest";
+	const api_url="https://wop-api.chease.cn/router/rest";
 	protected $params=array(
 	 	"v"=>"2.0",
 	 	"format"=>"json",
@@ -9,10 +9,10 @@ class api_v2{
 	);
 
 	public static $domain = array(
-		'wx'=>'wx.autogps.chease.cn',//'wx.autogps.cn',
-		'user'=>'user.autogps.chease.cn',//'user.autogps.cn',
-		'wo'=>'w.wo365.chease.cn',//'w.wo365.net',
-		'wxwo'=>'wx.wo365.chease.cn'//'wx.wo365.net'
+		'wx'=>'wx.autogps.cn',//'wx.autogps.chease.cn',
+		'user'=>'user.autogps.cn',//'user.autogps.chease.cn',
+		'wo'=>'w.wo365.net',//'w.wo365.chease.cn',
+		'wxwo'=>'wx.wo365.net'//'wx.wo365.chease.cn'
 	);
 
 	//返回当前域名openId的key名,域名中的点符号“.”使用下划线“_”替换，并且在最后加上“_openId”

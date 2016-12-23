@@ -338,10 +338,10 @@ class pfb{
 
     //根据uid获取openId
     public static function getOpenId($userOrUid){
-        if(!is_array($userOrUid)){
-            $user=pfb::getUser($userOrUid);
-        }else{
+        if(is_array($userOrUid)){
             $user=$userOrUid;
+        }else{
+            $user=pfb::getUser($userOrUid);
         }
         $key=api_v2::getOpenIdKey(api_v2::$domain['wx']);//获取营销号的openid
         if(!$user||!$user['authData'])

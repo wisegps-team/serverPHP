@@ -49,6 +49,9 @@ switch ($_GET["method"]){
 	case "setMenu"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
 		setMenu();
 		break;
+	case "getBrand"://根据产品id获取产品品牌，主要在booking.js预订时使用，展示产品品牌
+		getBrand();
+		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
 		exit;
@@ -316,7 +319,16 @@ function setMenu(){
 	echo json_encode($wx->setMenu($jsonmenu));
 }
 
-
+//获取产品品牌
+function getBrand(){
+	global $opt,$API;
+	$pro=$API->start(array(
+		'method'=>'wicare.product.get',
+		'objectId'=>$_GET['objectId'],
+		'fields'=>'objectId,brand,brandId,name,company'
+	),$opt);
+	echo json_encode($pro);
+}
 
 
 
