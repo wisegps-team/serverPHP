@@ -143,7 +143,7 @@ if(isset($_GET['code'])){
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="viewport" content="initial-scale=1.0, user-scalable=no">
 		<meta name="apple-mobile-web-app-capable" content="yes">
-		<title>确认支付</title>
+		<title>微信支付</title>
 		<style>
 			body{font-family: "微软雅黑";margin: 0;padding: 0;}
 			.nav{width: 100%; background-color:whitesmoke;border-bottom: 1px solid #ddd;position: fixed;}
@@ -182,7 +182,7 @@ if(isset($_GET['code'])){
     order.price_decimal=order.price.split(".")[1];
 	</script>
 	<body>
-		<div class="mui-content">
+		<div class="mui-content" style="display:none">
 			<img src="./autogps/img/icon_activation.png" style="width:120px;margin-top: 2em;max-width: 25%;">
 			<div style="color: #6D6D6D;margin-top: 10px;"><script>echo(order.title)</script></div>	
 			<div class="main">
@@ -190,7 +190,7 @@ if(isset($_GET['code'])){
 				<p style="margin-top: 0;"><script>echo(order.detail)</script></p>
 			</div>
 		</div>		
-		<div class="bottom">
+		<div class="bottom" style="display:none">
 			<button id="pay">确认支付</button>
 		</div>
 	</body>
@@ -198,7 +198,7 @@ if(isset($_GET['code'])){
 	function weixinCallback(res) {//微信支付返回
         res.orderId=oid;
 		localStorage.setItem(_g.key,JSON.stringify(res));
-		if (res.err_msg == "get_brand_wcpay_request:ok") {
+		if (res.err_msg == "get_brand_wcpay_request:ok"||res.err_msg == "get_brand_wcpay_request:cancel") {
             if(_g.callback)
                 location=_g.callback;
             else
@@ -239,6 +239,8 @@ if(isset($_GET['code'])){
             if(Math.abs(x-this.startX)<10)
                 pay.call(this);
         });
+        
+        pay.call(payBtn);
 	}
 	</script>
 </html>
