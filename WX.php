@@ -67,7 +67,7 @@ class WX{
 	//发送模板消息
 	function sendWeixin($open_id,$template_id,$data,$link){
 		$token=$this->getToken();
-		$url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=' . $token['access_token'];
+		$url = WX::wx_url.'message/template/send?access_token=' . $token['access_token'];
 		$data = '{"touser":"' . $open_id . '","template_id":"'. $template_id .'","url":"'. $link .'",' .
 		    '"data": '. $data . '}';
 		return $this->httpPost($url, $data);
@@ -77,7 +77,7 @@ class WX{
 	function addTemplate($template_id){
 		$tem=$this->getToken();
 		$token=$tem['access_token'];
-		$url='https://api.weixin.qq.com/cgi-bin/template/api_add_template?access_token='.$token;
+		$url=WX::wx_url.'template/api_add_template?access_token='.$token;
 		$data='{
            "template_id_short":"'.$template_id.'"
        	}';
@@ -88,8 +88,17 @@ class WX{
 	function setMenu($jsonmenu){
 		$tem=$this->getToken();
 		$token=$tem['access_token'];
-		$url='https://api.weixin.qq.com/cgi-bin/menu/create?access_token='.$token;
+		$url=WX::wx_url.'menu/create?access_token='.$token;
 		return json_decode($this->httpPost($url,$jsonmenu),true);
+	}
+
+	function getUser($next){
+		$tem=$this->getToken();
+		$token=$tem['access_token'];
+		$url=WX::wx_url.'user/get?access_token='.$token;
+		if(isset($next)&&$next)
+			$url.='&next_openid='.$next;
+		return json_decode($this->httpGet($url),true);
 	}
 
 
