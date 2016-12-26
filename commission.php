@@ -4,6 +4,7 @@
  * 本页面获取到openid并且根据传递的参数进行下单，直接echo到页面
  */
 include 'api_v2.php';
+include 'WX.php';
 include 'checkAndPay.php';
 $API=new api_v2();//api接口类
 session_start();
@@ -24,7 +25,7 @@ function https_request($url){
 
 //输出错误信息并退出脚本
 function echoExit($str){
-	echo '<h1>'.$str.'</h1>';
+	echo '<h1 style="text-align: center">'.$str.'</h1>';
 	exit;
 }
 
@@ -47,7 +48,7 @@ function getOrder(){
     $order=$API->start(array(
         'method'=>'wicare.order.get',
         'oid'=>$_GET['oid'],
-        'fields'=>'uid,to_uid,attach,amount'
+        'fields'=>'uid,to_uid,attach,amount,remark'
     ),$opt);
     if($order&&$order['data'])
         return $order['data'];
@@ -103,9 +104,9 @@ if(isset($_POST['oid'])){//支付成功之后
         echoExit('支付成功，但获取人员推送失败，请截图联系技术人员，bookingId='.$bookingId);
     }
     $e_user=pfb::getUser($emp['uid']);
-    $remark=$booking['userName'].'/'.$booking['userMobile'].'注册佣金';
+    $remark=$_SESSION['remark'];
 
-    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$_SESSION['receipt']);
+    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$_SESSION['receipt'],$cust['name'],$emp['name'],true);
     echoExit('支付成功，请关闭本页面');
 }else if(isset($_GET['code'])){
     // //根据域名获取公众号信息
@@ -128,32 +129,33 @@ if(isset($_POST['oid'])){//支付成功之后
 
     $code = $_GET['code'];
     $openid = getOpenid($code,$appData['wxAppKey'],$appData['wxAppSecret']);
-    $o_order=getOrder();
-    if($o_order['flag']==1)
-        echoExit('佣金已支付');
+    if(pfb::checkPay($_GET['bookingId'],1))
+        echoExit($_GET['remark'].'已支付，请勿重复付款！');
     //下单
-    $to_uid=getToUid($o_order);
+    $to_uid=$_GET['to_uid'];
     if(!$to_uid)
         echoExit('无佣金收取方');
     $order=$API->start(array(
         'method'=>'wicare.pay.weixin',
         'open_id'=>$openid,
-        'uid'=>$o_order['uid'],
+        'uid'=>$_GET['uid'],
         'to_uid'=>$to_uid,
         'order_type'=>1,
-        'remark'=>'微信支付佣金',
-        'attach'=>$o_order['attach'],
-        'amount'=>$o_order['amount']
+        'remark'=>$_GET['remark'],
+        'attach'=>pfb::getAttach($_GET['bookingId'],1),
+        'amount'=>$_GET['amount']
     ),$opt);
     if($order['status_code']||!$order['pay_args']){
         echoExit('下单失败，'.json_encode($order));
     }
     $oid=$order['objectId'];
     $_SESSION['oid']=$order['objectId'];//新的oid
-    $_SESSION['commission']=$o_order['amount'];//佣金
-    $_SESSION['bookingId']=getBookingId($o_order);//预订id
+    $_SESSION['commission']=$_GET['amount'];//佣金
+    $_SESSION['bookingId']=$_GET['bookingId'];//预订id
     $_SESSION['receipt']=$_GET['receipt'];//预付款到帐金额
     $_SESSION['cid']=$_GET['cid'];//公司id
+    $_SESSION['remark']=$_GET['remark'];//备注
+    
     
     $pay_args=json_encode($order['pay_args']);
 }else {
@@ -208,7 +210,7 @@ if(isset($_POST['oid'])){//支付成功之后
     order.price_decimal=order.price.split(".")[1];
 	</script>
 	<body>
-		<div class="mui-content">
+		<div class="mui-content" style="display:none">
 			<img src="./img/icon_activation.png" style="width:120px;margin-top: 2em;max-width: 25%;">
 			<div style="color: #6D6D6D;margin-top: 10px;"><script>echo(order.title)</script></div>	
 			<div class="main">
@@ -216,12 +218,12 @@ if(isset($_POST['oid'])){//支付成功之后
 				<p style="margin-top: 0;"><script>echo(order.detail)</script></p>
 			</div>
 		</div>		
-		<div class="bottom">
+		<div class="bottom" style="display:none">
 			<button id="pay">确认支付</button>
 		</div>
-        <from id="f" action="#" method="post">
+        <form id="f" method="post">
             <input type="hidden" name="oid" value="<?php echo $oid; ?>"> 
-        </from>
+        </form>
 	</body>
 	<script>
 	function weixinCallback(res) {//微信支付返回
@@ -266,6 +268,8 @@ if(isset($_POST['oid'])){//支付成功之后
             if(Math.abs(x-this.startX)<10)
                 pay.call(this);
         });
+
+        pay.call(payBtn);
 	}
 	</script>
 </html>

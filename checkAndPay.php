@@ -26,9 +26,6 @@ function checkAndPay($booking,$cid,$device,$payAll){
         return 3;
     }
     $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
-    //给预订人发送微信推送
-    if($booking['type']==1)
-        pfb::sendToBooker($sid,$booking,$device);
 
     $cust=pfb::getCustomer($cid);//customer表记录
     pfb::addLog('商户信息cust:'.json_encode($cust));
@@ -40,6 +37,10 @@ function checkAndPay($booking,$cid,$device,$payAll){
     $bill_type='预付款到账';
     $err_remark='请联系技术人员处理';
     $amount=0;
+
+    //给预订人发送微信推送
+    if($booking['type']==1)
+        pfb::sendToBooker($sid,$booking,$device,$cust);
 
     if($payAll)
         pfb::addLog('payAll&&booking[payMoney]:'.$booking['payMoney']);
@@ -107,7 +108,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         $emp_openId=pfb::getOpenId($e_user);
 
         $commission=pfb::getCommission($booking,$device);//佣金金额
-        $remark=$booking['userName'].'/'.$booking['userMobile'].'注册佣金';
+        $remark='IMEI：'.$device['did'].'佣金';
         $pay=$API->start(array(//余额支付
             'method'=>'wicare.pay.balance',
             'uid'=>$pay_user['objectId'],
@@ -115,7 +116,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
             'bill_type'=>3,
             'amount'=>$commission,
             'remark'=>$remark,
-            'attach'=>pfb::getAttach($booking['objectId'],1,$emp['uid'])
+            'attach'=>pfb::getAttach($booking['objectId'],1)
         ),$opt);
         pfb::addLog('佣金支付返回pay:'.json_encode($pay));
         if($pay['status_code']){
@@ -123,17 +124,17 @@ function checkAndPay($booking,$cid,$device,$payAll){
             if($pay['status_code']==8196){//余额不足，微信推送
                 $appData=WX::payAppData();
                 $tem=$wei['template']['OPENTM406963151'];
-                $_url='http://'.api_v2::$domain['user'].'/commission.php/?bookingId='.$booking['objectId'].'&cid='.$cid.'&receipt='.$amount.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark);
+                $_url='http://'.api_v2::$domain['user'].'/commission.php?bookingId='.$booking['objectId'].'&cid='.$cid.'&receipt='.$amount.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark).'&uid='.$pay_user['objectId'].'&to_uid='.$e_user['objectId'];
                 $url="https://open.weixin.qq.com/connect/oauth2/authorize?appid=".$appData['wxAppKey']."&redirect_uri=".rawurlencode($_url)."&response_type=code&scope=snsapi_base&state=state#wechat_redirect";
                 pfb::addLog('$cust_openId:'.$cust_openId);
 	            $_res=$wx->sendWeixin($cust_openId,$tem,'
                 {
                     "first": {
-                        "value": "您有一笔待支付佣金",
+                        "value": "订单ID：'.$booking['objectId'].'",
                         "color": "#173177"
                     },
                     "keyword1": {
-                        "value": "'.$emp['name'].'的佣金",
+                        "value": "'.$device['model'].'/IMEI：'.$device['did'].'",
                         "color": "#173177"
                     },
                     "keyword2": {
@@ -141,15 +142,15 @@ function checkAndPay($booking,$cid,$device,$payAll){
                         "color": "#173177"
                     },
                     "keyword3": {
-                        "value": "'.$commission.'",
+                        "value": "'.number_format($commission,2).'",
                         "color": "#173177"
                     },
                     "remark": {
-                        "value": "由于您的余额不足，请点击详情进入微信支付",
+                        "value": "'.$cust['name'].'账户余额不足，请点击详情进入微信支付",
                         "color": "#173177"
                     }
                 }',$url);
-                pfb::addLog('发送佣金支付出错pay返回:'.json_encode($_res));
+                pfb::addLog('发送佣金代支付提醒pay返回:'.json_encode($_res));
                 return 3;
             }
             $r='错误码'.$pay['status_code'].','.$err_remark;
@@ -158,7 +159,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         }
 
         //支付成功，发送两条余额变动
-        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking['objectId'],$amount,$sid);
+        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking['objectId'],$amount,$sid,$cust['name'],$emp['name']);
         return 0;
     }
 }
@@ -206,7 +207,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
             'method'=>'wicare.activityProduct.get',
             'uid'=>$sid,
             'productId'=>$device['modelId'],
-            'fields'=>'objectId,uid,price,installationFee,reward,name,productId,brandId,brand'
+            'fields'=>'price,installationFee,reward,name,productId,brandId,brand'
         ),$opt);
         if(!$dev||!isset($dev['data'])){//活动产品表返回空
             // return '此产品无活动';
@@ -292,14 +293,12 @@ function addDeviceLog($device,$uid,$name,$booking){
 //pay for booking
 //容纳本页脚本需要用到的静态方法
 class pfb{
-    public static function getAttach($booking_id,$type=0,$to_uid){
+    public static function getAttach($booking_id,$type=0){
         $str=array(
             'payToCust',//'从公帐转入商户公帐',
             'payToSeller'//'从商户支付佣金'
         );
         $attach=$booking_id.','.$str[$type];
-        if($to_uid)
-            $attach.=','.$to_uid;
         return $attach;
     }
 
@@ -425,7 +424,7 @@ class pfb{
             'method'=>'wicare.order.get',
             'attach'=>$attach
         ),$opt);
-        if($pay&&$pay['data'])
+        if($pay&&$pay['data']&&$pay['data']['flag']==1)
             return true;
         else
             return false;
@@ -476,7 +475,7 @@ class pfb{
     }
 
     //发送余额变动通知
-    public static function sendBalanceChange($wx,$wei,$openId,&$user,$amount,$title,$remark=''){
+    public static function sendBalanceChange($wx,$wei,$openId,&$user,$amount,$account,$remark=''){
         if($amount==0)return array(
             "errcode"=>0,
             "errmsg"=>"金额为0，不进行推送"
@@ -486,12 +485,12 @@ class pfb{
         $date=date("Y-m-d H:i:s");
         $user['balance']=$user['balance']+$amount;
         $type='入账';
-        if($amount<0)$type='出账';
+        if($amount<0)$type='支付';
 
         return $wx->sendWeixin($openId,$tem,'
         {
             "first": {
-                "value": "'.$title.'",
+                "value": "账户：'.$account.'",
                 "color": "#173177"
             },
             "keyword1": {
@@ -514,7 +513,7 @@ class pfb{
     }
 
     //发送给预订人，车主已注册
-    public static function sendToBooker($cid,$booking,$device){
+    public static function sendToBooker($cid,$booking,$device,$cust){
         $wei=pfb::getWeixin($cid,0);
         if(!$wei)
             return;
@@ -525,7 +524,7 @@ class pfb{
 
         $date=date("Y-m-d H:i");
         $user=$booking['userName'].'/'.$booking['userMobile'];
-        $remark='车主信息：'.$user.'\\n注册时间：'.$date;
+        $remark='订单ID：'.$booking['objectId'];
         return $res=$wx->sendWeixin($openId,$tem,'
         {
             "first": {
@@ -559,14 +558,16 @@ class pfb{
      * $remark 推送的备注,$booking_id 预订单的id,
      * $amount 可选，预订时预付款的金额
      */
-    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount,$sid){
+    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount,$sid,$payName,$name,$flag){
         global $API,$opt;
-        pfb::addLog('commissionSuccess:发送余额变动');
-        $emp_openId=pfb::getOpenId($e_user);
-        $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,(0-$commission),'佣金支出',$remark);//发送给商户
-        pfb::addLog('佣金支出'.json_encode($_r));
 
-        
+        if(!isset($flag)||!$flag){//默认发送给支付人
+            pfb::addLog('commissionSuccess:发送余额变动');
+            $emp_openId=pfb::getOpenId($e_user);
+            $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$commission,$payName,$remark);//发送给商户
+            pfb::addLog('佣金支出'.json_encode($_r));
+        }
+
         //更新预订表信息
         $b=array(
             'method'=>'wicare.booking.update',
@@ -588,7 +589,7 @@ class pfb{
                 return;
             $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
         }
-        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,'佣金到帐',$remark);//发送给推荐人
+        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,$name,'订单'.$booking_id.'佣金');//发送给推荐人
         pfb::addLog('佣金到帐'.json_encode($_r));
     }
 
@@ -604,10 +605,16 @@ class pfb{
             $emp=$API->start(array(
                 'method'=>'wicare.customer.get',
                 'objectId'=>$sid,
-                'fields'=>'uid,parentId,name'
+                'fields'=>'uid,parentId,name,custTypeIdm,contact'
             ),$opt);
             if(pfb::dataNull($emp))
                 return false;
+            if($emp['data']['custTypeId']!=7){//不是车主，是管理员
+                if($emp['data']['contact'])
+                    $emp['data']['name']=$emp['data']['contact'];
+                else
+                    $emp['data']['name']=$emp['data']['name'].'-管理员';
+            }
         }
         return $emp['data'];
     }

@@ -134,7 +134,7 @@ class WX{
 	    return $result;
 	}
 
-	public function payAppData(){
+	public static function payAppData(){
         //微车联
 		$wcl=array(
 			'wxAppKey'=>'wxa5c196f7ec4b5df9',

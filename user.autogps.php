@@ -164,7 +164,7 @@ class wechatCallbackapiTest
             'method'=>'wicare.booking.get',
             'objectId'=>$booking_id,
             'status'=>0,
-            'fields'=>'activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,orderId,payMoney,product'
+            'fields'=>'objectId,activityId,mobile,sellerId,sellerName,uid,name,openId,type,userName,userMobile,carType,createdAt,payStatus,orderId,payMoney,product'
         ),$opt);
         if(!$booking['data'])
             return '无预订信息';
@@ -216,17 +216,18 @@ class wechatCallbackapiTest
             global $opt,$API;
             $r=$API->start(array(
                 'method'=>'wicare.booking.update',
-                '_objectId'=>$booking['objectId'],
+                '_objectId'=>$booking_id,
                 'carType.qrStatus'=>'1'
             ),$opt);
             if($r['status_code']&&$r['status_code']!=0){
-                pfb::addLog('预订'.$booking['objectId'].'更新qrStatus出错：'.$r['status_code']);
+                pfb::addLog('预订'.$booking_id.'更新qrStatus出错：'.$r['status_code']);
             }
             $emp=$API->start(array(//获取人员信息
                 'method'=>'wicare.employee.get',
                 'objectId'=>$booking['sellerId'],
                 'fields'=>'uid,name,objectId,companyId'
             ),$opt);
+            pfb::addLog('获取人员信息：'.json_encode($emp));
             if($emp&&$emp['data']){//推荐人是一个员工
                 $uid=$emp['data']['uid'];
                 $wei=pfb::getWeixin($emp['data']['companyId']);
@@ -246,7 +247,8 @@ class wechatCallbackapiTest
                     $open_id=pfb::getOpenId($uid);
                 }
             }
-            $remark='车主信息：'.$booking['data']['name'].'/'.$booking['data']['mobile'];
+            pfb::addLog('获取人员信息：'.$open_id);
+            $remark='车主信息：'.$booking['name'].'/'.$booking['mobile'];
             sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,'#');
         };
         if(!$wei){

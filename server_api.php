@@ -52,6 +52,9 @@ switch ($_GET["method"]){
 	case "getBrand"://根据产品id获取产品品牌，主要在booking.js预订时使用，展示产品品牌
 		getBrand();
 		break;
+	case "getWeixinKey"://根据uid获取公众号key
+		getWeixinKey();
+		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
 		exit;
@@ -328,6 +331,23 @@ function getBrand(){
 		'fields'=>'objectId,brand,brandId,name,company'
 	),$opt);
 	echo json_encode($pro);
+}
+
+//根据uid获取公众号appid
+function getWeixinKey(){
+	global $opt,$API;
+	$_wx=array(
+		'method'=>'wicare.weixin.get',
+		'uid'=>$_GET['uid'],
+		'type'=>$_GET['type'],
+		'fields'=>'wxAppKey,uid,type,objectId,name'
+	);
+	$wei=$API->start($_wx,$opt);
+
+	if(!$wei['data']||!$wei['data']['wxAppKey']){
+		echoExit(-6,'服务商公众号未正确配置');
+	}
+	echo json_encode($wei);
 }
 
 
