@@ -212,13 +212,14 @@ class wechatCallbackapiTest
         $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
         //保存一个匿名方法，把响应返回给微信之后调用
         //发送推送给营销人员，或者是车主（推荐有礼）
-        $longTimeTask[count($longTimeTask)]=function() use($wei,$title,$date,$p,$pay,$user,$booking){
+        $longTimeTask[count($longTimeTask)]=function() use($wei,$title,$date,$p,$pay,$user,$booking,$booking_id){
             global $opt,$API;
             $r=$API->start(array(
                 'method'=>'wicare.booking.update',
                 '_objectId'=>$booking_id,
                 'carType.qrStatus'=>'1'
             ),$opt);
+            pfb::addLog('预订信息'.json_encode($booking));
             if($r['status_code']&&$r['status_code']!=0){
                 pfb::addLog('预订'.$booking_id.'更新qrStatus出错：'.$r['status_code']);
             }
