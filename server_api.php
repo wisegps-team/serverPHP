@@ -55,6 +55,9 @@ switch ($_GET["method"]){
 	case "getWeixinKey"://根据uid获取公众号key
 		getWeixinKey();
 		break;
+	case "bindOpenId"://绑定微信openid
+		bindOpenId();
+		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
 		exit;
@@ -348,6 +351,45 @@ function getWeixinKey(){
 		echoExit(-6,'服务商公众号未正确配置');
 	}
 	echo json_encode($wei);
+}
+
+//绑定微信
+function bindOpenId(){
+	global $opt,$API;
+	//验证短信
+	$r=$API->start(array(
+		'method'=>'wicare.comm.validCode',
+		'valid_type'=>1,
+		'valid_code'=>$_GET['code'],
+		'mobile'=>$_GET['mobile']
+	),$opt);
+	if($r&&!$r['status_code']&&$r['valid']){
+		$k=api_v2::getOpenIdKey($_GET['host']);
+		$key='authData.'.$k;
+		$user=$API->start(array(
+			'method'=>'wicare.user.get',
+			'fields'=>'objectId,mobile',
+			$key => $_GET['openId']
+		),$opt);
+		if($user['data']){//解绑原来的账号
+			$user=$API->start(array(
+				'method'=>'wicare.user.update',
+				'_objectId'=>$user['data']['objectId'],
+				$key => rand(0,100000000),
+				'authData.'.$k.'_unbind'=>date('Y-m-d H:i:s')
+			),$opt);
+		}
+		$res=$API->start(array(
+			'method'=>'wicare.user.update',
+			'_mobile'=>$_GET['mobile'],
+			$key => $_GET['openId'],
+			'authData.'.$k.'_bind'=>date('Y-m-d H:i:s')
+		),$opt);
+		echo json_encode($res);
+	}else{
+		$r['status_code']=36872;
+		echo json_encode($r);
+	}
 }
 
 

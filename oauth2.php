@@ -4,6 +4,7 @@
  * User: 1
  * Date: 2016-09-27
  */
+date_default_timezone_set('PRC'); 
 include 'api_v2.php';
 $API=new api_v2();//api接口类
 
@@ -11,34 +12,36 @@ if(isset($_GET['code'])){
 
     //根据域名获取公众号信息
     $_host=$_SERVER['HTTP_HOST'];//当前域名
-    
+    $weixin=array();
     if(isset($_GET['wx_app_id'])){
-        $custData=array(
+        $wxData=array(
             'wxAppKey' => $_GET['wx_app_id'],
             'method'=>'wicare.weixin.get',
             'fields'=>'wxAppKey,wxAppSecret'
         );
-        $appRes=$API->start($custData,$opt);
-        // print_r($appRes);
-    }else{
-        //用于获取app数据
-        $appData=array(
-            'domainName' => $_host,
-            'method'=>'wicare.app.get',
-            'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
-        );
-        //获取app数据
-        $appRes=$API->start($appData);
+        $weixin=$API->start($wxData,$opt);
+        $weixin=$weixin['data'];
+        // echo '获取到的<br/>';
+        // print_r($weixin);
     }
+    //用于获取app数据
+    $appData=array(
+        'domainName' => $_host,
+        'method'=>'wicare.app.get',
+        'fields'=>'devId,name,logo,version,appKey,appSecret,sid,wxAppKey,wxAppSecret'
+    );
+    //获取app数据
+    $appRes=$API->start($appData);
     
     if(!$appRes||!$appRes['data']){
         echo 'Not configured domainName';
         exit;
     }
     $appData=$appRes['data'];
+    $appData=array_merge($appData,$weixin);
 
     $code = $_GET['code'];
-    $userinfo = getUserInfo($code,$appData['wxAppKey'],$appData['wxAppSecret']);
+    $userinfo = getUserInfo($code,$appData);
     if(isset($_GET['state']))
         $userinfo["state"]=$_GET['state'];
 
@@ -48,7 +51,9 @@ if(isset($_GET['code'])){
 }
 
 
-function getUserInfo($code,$appid,$appsecret){
+function getUserInfo($code,$appData){
+    $appid=$appData['wxAppKey'];
+    $appsecret=$appData['wxAppSecret'];
     $access_token = "";
 
     // 根据code获取access_token
@@ -64,13 +69,20 @@ function getUserInfo($code,$appid,$appsecret){
     if($_GET['state']=='getOpenId'){//如果只是获取openid，则就此返回
         return $userinfo_array;
     }
+    if(!$openid){
+        print_r($access_token_array);
+        echo '<br/>'.$_GET['wx_app_id'];
+        echo '<br/>';
+        print_r($appData);
+        exit;
+    }
         
     // 根据access token获取用户信息
     // $userinfo_url = "https://api.weixin.qq.com/sns/userinfo?access_token=$access_token&openid=$openid";
     // $userinfo_json = https_request($userinfo_url);
     // $userinfo_array = json_decode($userinfo_json, true);
     if($_GET['state']=='sso_login'){//进行登录
-        $login_info=sso_login($userinfo_array["openid"]);
+        $login_info=sso_login($userinfo_array["openid"],$appData);
         $login_info['sso_login']='sso_login';
     }
         
@@ -81,14 +93,36 @@ function getUserInfo($code,$appid,$appsecret){
     return $userinfo_array;
 }
 
-function sso_login($login_id){
+function sso_login($login_id,$appData){
     global $API,$opt;
+    if(!$login_id){
+        return array();
+    }
+    $op=array(
+        'app_key'=>$appData['appKey'],
+        'app_secret'=>$appData['appSecret']
+    );
     $key=api_v2::getOpenIdKey();
     $custData=array(
         'authData.'.$key => $login_id,
         'method'=>'wicare.user.sso_login'
     );
-    return $API->start($custData,$opt);
+    $res=$API->start($custData,$op);
+    if($res['uid']){//登录成功，更新登录信息
+        // echo $res['uid'];
+        $auth=array(
+            'method'=>'wicare.user.update',
+            '_objectId'=>$res['uid'],
+            'authData.'.$key.'_wx'=>$appData['wxAppKey'],
+            'authData.'.$key.'_login_date'=>date('Y-m-d H:i:s')
+        );
+        // print_r($auth);
+        $r=$API->start($auth,$opt);
+        // print_r($r);
+        // echo '没有错误';
+        // exit;
+    }
+    return $res;
 }
 
 function https_request($url){
