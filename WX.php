@@ -131,8 +131,21 @@ class WX{
 	        echo 'ERROR: '.curl_error($ch).'<br />';
 	    }
 	    curl_close($ch);
+		if(strpos($result,"40001")){//如果返回结果中有提示40001错误码，即token错误，则记录下来
+			$this->addLog($result);
+			$this->addLog('接口：'.$url);
+			$this->addLog('数据：'.$msg);
+		}
 	    return $result;
 	}
+
+	//添加日志
+    protected function addLog($content){
+        $log_filename = "wx_log.txt";
+        $content.='------'.date("Y-m-d H:i:s").'
+        ';
+        file_put_contents($log_filename,$content,FILE_APPEND);
+    }
 
 	public static function payAppData(){
         //微车联
