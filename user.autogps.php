@@ -107,17 +107,16 @@ class wechatCallbackapiTest
         $content = "";
         switch($object->Event){
             case "subscribe"://未关注扫描二维码
-                $content = "欢迎您进入WiCARE车联网世界。";
-
-                if(isset($object->EventKey)){//扫描带参数的二维码关注的
+                $content = "感谢关注。";
+                if(isset($object->EventKey)&&$object->EventKey){//扫描带参数的二维码关注的
                     $scene=substr($object->EventKey,8);
                     $content=$this->switchScene($scene,$object->FromUserName);
                 }
                 break;
             case "SCAN"://已关注扫描二维码
                 $content='感谢您的扫描';
-                if(isset($object->EventKey)){//扫描带参数的二维码关注的
-                    $scene=$object->EventKey; 
+                if(isset($object->EventKey)&&$object->EventKey){//扫描带参数的二维码关注的
+                    $scene=$object->EventKey;
                     $content=$this->switchScene($scene,$object->FromUserName);
                 }
                 break;
@@ -168,8 +167,11 @@ class wechatCallbackapiTest
         ),$opt);
         if(!$booking['data'])
             return '无预订信息';
-        if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id)//为自己预订且不是车主
+        if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id){//为自己预订且不是车主
+            pfb::addLog('感谢关注open_id'.$open_id.'---bookingOpenId'.$booking['data']['openId']);
             return '感谢关注';
+        }
+            
         $product=$booking['data']['product'];
 
         $activity=$API->start(array(//获取活动信息
@@ -183,12 +185,7 @@ class wechatCallbackapiTest
             $pay=number_format($booking['data']['payMoney'],2);
         else
             $pay='0.00';
-        // if($booking['data']['payStatus']){
-        //     if($booking['data']['payStatus']==1)
-        //         $pay='订金 '.number_format($booking['data']['payMoney'],2);
-        //     else if($booking['data']['payStatus']==2)
-        //         $pay='设备款 '.number_format($booking['data']['product']['price'],2).'，安装费 '.number_format($booking['data']['product']['installationFee'],2);
-        // }
+
         $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['data']['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
 
         $remark='点击详情选择授权安装网点';
@@ -214,6 +211,7 @@ class wechatCallbackapiTest
         //发送推送给营销人员，或者是车主（推荐有礼）
         $longTimeTask[count($longTimeTask)]=function() use($wei,$title,$date,$p,$pay,$user,$booking,$booking_id){
             global $opt,$API;
+            $booking=$booking['data'];
             $r=$API->start(array(
                 'method'=>'wicare.booking.update',
                 '_objectId'=>$booking_id,
@@ -228,7 +226,7 @@ class wechatCallbackapiTest
                 'objectId'=>$booking['sellerId'],
                 'fields'=>'uid,name,objectId,companyId'
             ),$opt);
-            pfb::addLog('获取人员信息：'.json_encode($emp));
+            pfb::addLog('获取人员id：'.$booking['sellerId'].'；获取到的信息'.json_encode($emp));
             if($emp&&$emp['data']){//推荐人是一个员工
                 $uid=$emp['data']['uid'];
                 $wei=pfb::getWeixin($emp['data']['companyId']);
@@ -248,7 +246,7 @@ class wechatCallbackapiTest
                     $open_id=pfb::getOpenId($uid);
                 }
             }
-            pfb::addLog('获取人员信息：'.$open_id);
+            pfb::addLog('获取车主信息：'.$open_id);
             $remark='车主信息：'.$booking['name'].'/'.$booking['mobile'];
             sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,'#');
         };
@@ -295,21 +293,34 @@ class wechatCallbackapiTest
             'authData.'.$openIdKey => $open_id,
             'method'=>'wicare.user.sso_login'
         ),$opt);
-        if(isset($user['access_token'])){//已经有账号
-            return '您已注册，请进入系统进行设备绑定';
-        }
 
         $booking=$API->start(array(//获取预订信息
-            'method'=>'wicare.booking.get',
+            'method'=>'wicare.booking.list',
             'userOpenId'=>$open_id,
+            'installId'=>$device['uid'],
             'status'=>0,
             'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,install,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
         ),$opt);
-        $link='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'].'&did='.$did.'&openid='.$open_id;//注册链接
+        $link='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.
+            $_GET['wxAppKey']
+            .'&did='.$did   //设备imei
+            .'&openid='.$open_id    //扫码人openId
+            .'&installId='.$device['uid'];//设备拥有者，就是安装网点
+        if($user['access_token']){
+            $link.='&token='.$user['access_token'].'&uid='.$user['uid'];  //扫码人的user id，如果有账号的话
+        }
         $remark='点击详情继续注册';
         if($booking&&$booking['data']){
-            $booking=$booking['data'];
-            $link=$link.'&bookingId='.$booking['objectId'];
+            $bookings=$booking['data'];
+            $len=count($bookings);
+            if($len>0){
+                if($len>1)//如果不止一条预订，则通过bookingId=true通知前端页面
+                    $link=$link.'&bookingId=more';
+                else{ //只有一条预订，直接传递给前端
+                    $booking=$bookings[0];
+                    $link=$link.'&bookingId='.$booking['objectId'];
+                }
+            }
         }
         
         $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
@@ -341,6 +352,7 @@ class wechatCallbackapiTest
                 "color": "#173177"
             }
         }',$link);
+        pfb::addLog('发送返回'.json_encode($res));
         return $content;
     }
 

@@ -170,7 +170,8 @@ function getUserOpenId(){
 		'fields'=>'objectId,authData'
 	),$opt);
 	if($user['data']&&$user['data']['authData']){
-		$user['data']=$user['data']['authData']['openId'];
+		$k=api_v2::getOpenIdKey(api_v2::$domain['wx']);
+		$user['data']=$user['data']['authData'][$k];
 	}
 	echo json_encode($user);
 }
@@ -227,7 +228,8 @@ function checkExists(){
 		);
 		if($user['data']['userType']==9){
 			$d['method']='wicare.employee.get';
-		}
+		}else
+			$d['appId']=$_GET['appId'];
 		
 		$cust=$API->start($d,$opt);
 		if($cust['data'])
@@ -244,6 +246,11 @@ function addAndBindCar(){
 	$open_id=$_GET['openId'];
 	$phone=$_GET['mobile'];
 	$name=$_GET['name'];
+	$bookingId=$_GET['bookingId'];
+
+	//如果没有传车牌号，则必须传递一个车辆id
+	$carId=$_GET['carId'];
+	$carNum=$_GET['carNum'];
 
 	$device=$API->start(array(//验证设备
 		'method'=>'wicare._iotDevice.get',
@@ -260,7 +267,7 @@ function addAndBindCar(){
 
 	$booking=$API->start(array(//获取预订信息
 		'method'=>'wicare.booking.get',
-		'userMobile'=>$phone,
+		'objectId'=>$bookingId,
 		'status'=>0,
 		'fields'=>'objectId,type,activityId,sellerId,uid,mobile,name,openId,carType,install,installId,userMobile,userName,userOpenId,payMoney,orderId,product'
 	),$opt);
@@ -269,13 +276,13 @@ function addAndBindCar(){
 	else
 		$booking=$booking['data'];
 	//添加车辆绑定设备
-	$device=addAndBind($uid,'默认车牌',$device,$open_id,$phone,$name,$booking);
+	$device=addAndBind($uid,$carNum,$device,$open_id,$phone,$name,$booking,$carId);
 	if(!is_array($device)){
 		echo '{"status_code":"'.$device.'"}';
 	}
 
 	//添加出入库记录
-	addDeviceLog($device,$uid,$booking['name'],$booking);
+	addDeviceLog($device,$uid,$name,$booking);
 	echo '{"status_code":0}';
 }
 
@@ -286,7 +293,7 @@ function setMenu(){
 		echoExit(0,'');
 	}
 	$reg='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Fregister.html&intent=logout&needOpenId=true&wx_app_id='.$_GET['wxAppKey'];
-	$my='http://'.api_v2::$domain['user'].'/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account&wx_app_id='.$_GET['wxAppKey'];
+	$my='http://'.api_v2::$domain['user'].'/?loginLocation=%2Fwo365_user%2Fsrc%2Fmoblie%2Fmy_account.html&wx_app_id='.$_GET['wxAppKey'];
 	$home='http://'.api_v2::$domain['user'].'/?wx_app_id='.$_GET['wxAppKey'];
 
 	if(isset($wei['menu'])&&!isset($wei['menu']['none']))
@@ -303,19 +310,9 @@ function setMenu(){
 			},
 			'.$menu.'
 			{
-				"name": "更多",
-				"sub_button": [
-					{
-						"type": "view",
-						"name": "我的账号",
-						"url": "'.$my.'"
-					},
-					{
-						"type": "view",
-						"name": "车主推荐",
-						"url": "'.$my.'"
-					}
-				]
+				"name": "我的",
+				"type": "view",
+				"url": "'.$my.'"
 			}
 		]
 	}';

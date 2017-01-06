@@ -171,22 +171,25 @@ function checkAndPay($booking,$cid,$device,$payAll){
  *  '2:'+接口错误码：绑定设备失败
  *  '3:'+接口错误码：更新预订信息
 */
-function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
+function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking,$carId){
     global $opt,$API;
     $cid=$device['uid'];//设备原拥有者，商户id
     $did=$device['did'];
-    $sid=$booking['uid'];//活动创建商户id
     
-    $car=$API->start(array(//添加车辆
-        'method'=>'wicare.vehicle.create',
-        'name'=>$vehicleName,
-        'uid'=>$uid,
-        'did'=>$did,
-        'deviceType'=>$device['model']
-    ),$opt);
-    if($car['status_code']){
-        return '1+'.$car['status_code'];
+    if(!$carId){//没有传车辆id进来，则必须传车牌号，新建一个车辆绑定
+        $car=$API->start(array(//添加车辆
+            'method'=>'wicare.vehicle.create',
+            'name'=>$vehicleName,
+            'uid'=>$uid,
+            'did'=>$did,
+            'deviceType'=>$device['model']
+        ),$opt);
+        if($car['status_code']){
+            return '1+'.$car['status_code'];
+        }
+        $carId=$car['objectId'];
     }
+
 
     $_device=$API->start(array(//绑定设备
         'method'=>'wicare._iotDevice.update',
@@ -194,7 +197,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
         'binded'=>true,
         'bindDate'=>date("Y-m-d H:i:s"),
         'vehicleName'=>$vehicleName,
-        'vehicleId'=>$car['objectId'],
+        'vehicleId'=>$carId,
         'uid'=>$uid
     ),$opt);
     if($_device['status_code']){
@@ -203,6 +206,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking){
 
     
     if($booking){
+        $sid=$booking['uid'];//活动创建商户id
         $dev=$API->start(array(//活动产品表获取设备安装费用的信息
             'method'=>'wicare.activityProduct.get',
             'uid'=>$sid,
@@ -287,7 +291,10 @@ function addDeviceLog($device,$uid,$name,$booking){
     //给下一级添加入库信息
     $API->start($pushLog,$opt);
     
-    return checkAndPay($booking,$cid,$device,true);
+    if($booking)
+        return checkAndPay($booking,$cid,$device,true);
+    else
+        return true;
 }
 
 //pay for booking
