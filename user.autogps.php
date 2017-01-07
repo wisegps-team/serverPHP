@@ -292,7 +292,10 @@ class wechatCallbackapiTest
         $user=$API->start(array(
             'authData.'.$openIdKey => $open_id,
             'method'=>'wicare.user.sso_login'
-        ),$opt);
+        ),array(
+            'app_key'=>"5775b54f2e44e702a4c975c064ec2efd",
+            'app_secret'=>"46f011a3b2503226c5f3a55a56e9ac05"
+        ));
 
         $booking=$API->start(array(//获取预订信息
             'method'=>'wicare.booking.list',
