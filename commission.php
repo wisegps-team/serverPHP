@@ -106,7 +106,7 @@ if(isset($_POST['oid'])){//支付成功之后
     $e_user=pfb::getUser($emp['uid']);
     $remark=$_SESSION['remark'];
 
-    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$_SESSION['receipt'],$cust['name'],$emp['name'],true);
+    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$cust['name'],$emp['name'],true);
     echoExit('支付成功，请关闭本页面');
 }else if(isset($_GET['code'])){
     // //根据域名获取公众号信息
@@ -152,7 +152,6 @@ if(isset($_POST['oid'])){//支付成功之后
     $_SESSION['oid']=$order['objectId'];//新的oid
     $_SESSION['commission']=$_GET['amount'];//佣金
     $_SESSION['bookingId']=$_GET['bookingId'];//预订id
-    $_SESSION['receipt']=$_GET['receipt'];//预付款到帐金额
     $_SESSION['cid']=$_GET['cid'];//公司id
     $_SESSION['remark']=$_GET['remark'];//备注
     

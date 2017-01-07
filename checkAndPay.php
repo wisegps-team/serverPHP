@@ -37,6 +37,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
     $bill_type='预付款到账';
     $err_remark='请联系技术人员处理';
     $amount=0;
+    $booking_id=$booking['objectId'];
 
     //给预订人发送微信推送
     if($booking['type']==1)
@@ -55,7 +56,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
         pfb::addLog('order订单信息:'.json_encode($order));
         if(pfb::dataNull($order)){//找不到对应的预付订单
             pfb::addLog('找不到对应的预付订单');
-            $_r=pfb::sendError($wx,$wei,$user,'您有一个预订订单到账失败',$booking['objectId'],$bill_type,$booking['payMoney'],'找不到预付订单，'.$err_remark);
+            $_r=pfb::sendError($wx,$wei,$user,'您有一个预订订单到账失败',$booking_id,$bill_type,$booking['payMoney'],'找不到预付订单，'.$err_remark);
             pfb::addLog('发送错误信息返回'.json_encode($_r));
             return 4;
         }
@@ -64,26 +65,38 @@ function checkAndPay($booking,$cid,$device,$payAll){
         $err_remark='账单编号：'.$order['objectId'].$err_remark;
         if($order['amount']==$booking['payMoney']&&$order['flag']==1){//检查金额，是否已支付
             //金额一致，检查是否已经支付,以及是否已转入商户
-            if($order['flag']==1&&!pfb::checkPay($booking['objectId'])){
+            if($order['flag']==1&&!pfb::checkPay($booking_id)){
                 //已支付并且未转入商户，则扣除手续费后转到商户余额
                 pfb::addLog('已支付并且未转入商户，则扣除手续费后转到商户余额');
                 $amount=pfb::processingFee($order['amount']);
                 $remark='IMEI：'.$device['did'].'货款';
-                pfb::payToCust($pay_user['objectId'],$amount,$remark,pfb::getAttach($booking['objectId']));
+                $pay_res=pfb::payToCust($pay_user['objectId'],$amount,$remark,pfb::getAttach($booking_id));
+                if($pay_res['status_code']){
+                    pfb::addLog('预订订单下单失败');
+                    pfb::sendError($wx,$wei,$user,'您有一个预订订单到账失败',$booking_id,$bill_type,$order['amount'],$err_remark);
+                    return 8;//下单转给经销商失败
+                }
                 pfb::addLog('已转到商户余额');
+                //更新货款转入安装网点时间和金额,还有支付的订单id防止重复支付
+                $API->start(array(
+                    'method'=>'wicare.booking.update',
+                    '_objectId'=>$booking_id,
+                    'payTime'=>date("Y-m-d H:i:s"),
+                    'receipt'=>$amount
+                ),$opt);
                 //发送余额变动通知
                 $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$amount,$cust['name'],$remark);
                 pfb::addLog('发送余额变动通知'.json_encode($_r));
             }else{
                 pfb::addLog('预订订单到账失败');
-                pfb::sendError($wx,$wei,$user,'您有一个预订订单到账失败',$booking['objectId'],$bill_type,$order['amount'],$err_remark);
+                pfb::sendError($wx,$wei,$user,'您有一个预订订单到账失败',$booking_id,$bill_type,$order['amount'],$err_remark);
                 return 5;//指定订单未支付成功
             }
         }else{
             pfb::addLog('金额不一致，说明出现意外'.$order['flag']);
             pfb::addLog('说明出现意外'.json_encode($order));
             //金额不一致，说明出现意外
-            pfb::sendError($wx,$wei,$user,'您有一个预订订单金额异常',$booking['objectId'],$bill_type,$order['amount'],$err_remark);
+            pfb::sendError($wx,$wei,$user,'您有一个预订订单金额异常',$booking_id,$bill_type,$order['amount'],$err_remark);
             return 6;//指定订单金额不一致
         }
     }
@@ -116,7 +129,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
             'bill_type'=>3,
             'amount'=>$commission,
             'remark'=>$remark,
-            'attach'=>pfb::getAttach($booking['objectId'],1)
+            'attach'=>pfb::getAttach($booking_id,1)
         ),$opt);
         pfb::addLog('佣金支付返回pay:'.json_encode($pay));
         if($pay['status_code']){
@@ -124,13 +137,13 @@ function checkAndPay($booking,$cid,$device,$payAll){
             if($pay['status_code']==8196){//余额不足，微信推送
                 $appData=WX::payAppData();
                 $tem=$wei['template']['OPENTM406963151'];
-                $_url='http://'.api_v2::$domain['user'].'/commission.php?bookingId='.$booking['objectId'].'&cid='.$cid.'&receipt='.$amount.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark).'&uid='.$pay_user['objectId'].'&to_uid='.$e_user['objectId'];
+                $_url='http://'.api_v2::$domain['user'].'/commission.php?bookingId='.$booking_id.'&cid='.$cid.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark).'&uid='.$pay_user['objectId'].'&to_uid='.$e_user['objectId'];
                 $url="https://open.weixin.qq.com/connect/oauth2/authorize?appid=".$appData['wxAppKey']."&redirect_uri=".rawurlencode($_url)."&response_type=code&scope=snsapi_base&state=state#wechat_redirect";
                 pfb::addLog('$cust_openId:'.$cust_openId);
 	            $_res=$wx->sendWeixin($cust_openId,$tem,'
                 {
                     "first": {
-                        "value": "订单ID：'.$booking['objectId'].'",
+                        "value": "订单ID：'.$booking_id.'",
                         "color": "#173177"
                     },
                     "keyword1": {
@@ -154,12 +167,12 @@ function checkAndPay($booking,$cid,$device,$payAll){
                 return 3;
             }
             $r='错误码'.$pay['status_code'].','.$err_remark;
-            pfb::sendError($wx,$wei,$e_user,'您有一个预订佣金异常',$booking['objectId'],'预订佣金',$commission,$r);
+            pfb::sendError($wx,$wei,$e_user,'您有一个预订佣金异常',$booking_id,'预订佣金',$commission,$r);
             return 7;//其他错误
         }
 
         //支付成功，发送两条余额变动
-        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking['objectId'],$amount,$sid,$cust['name'],$emp['name']);
+        pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$commission,$remark,$booking_id,$sid,$cust['name'],$emp['name']);
         return 0;
     }
 }
@@ -450,6 +463,7 @@ class pfb{
             'attach'=>$attach
         ),$opt);
         pfb::addLog('转商户余额返回'.json_encode($pay));
+        return $pay;
     }
 
     //发送账单异常处理提醒
@@ -565,7 +579,7 @@ class pfb{
      * $remark 推送的备注,$booking_id 预订单的id,
      * $amount 可选，预订时预付款的金额
      */
-    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$amount,$sid,$payName,$name,$flag){
+    public static function commissionSuccess($wx,$wei,$cust_openId,&$pay_user,&$e_user,$commission,$remark,$booking_id,$sid,$payName,$name,$flag){
         global $API,$opt;
 
         if(!isset($flag)||!$flag){//默认发送给支付人
@@ -580,13 +594,11 @@ class pfb{
             'method'=>'wicare.booking.update',
             '_objectId'=>$booking_id,
             'commission'=>$commission,
-            'payTime'=>date("Y-m-d H:i:s"),
+            'commissionDate'=>date("Y-m-d H:i:s"),//支付佣金时间
             'status'=>2,
             'status2'=>1,
             'status1'=>1
         );
-        if($amount)
-            $b['receipt']=$amount;
         $pay=$API->start($b,$opt);
         pfb::addLog('更新预订信息'.json_encode($pay));
 
