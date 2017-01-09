@@ -16,6 +16,11 @@ $API=new api_v2();//api接口类
 
 $_host=$_SERVER['HTTP_HOST'];//当前域名
 
+// if($_host=='autogps.cn'){
+// 	include 'url.php';
+// 	exit;
+// }
+
 //用于获取app数据
 $appData=array(
 	'domainName' => $_host,
