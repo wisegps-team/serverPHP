@@ -85,7 +85,9 @@ function checkAndPay($booking,$cid,$device,$payAll){
                     'receipt'=>$amount
                 ),$opt);
                 //发送余额变动通知
-                $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$amount,$cust['name'],$remark);
+                //点击进入企业账户页面
+                $_url='http://'.api_v2::$domain['wx'].'/autogps/src/moblie/home.html?loginLocation=financial_manage';
+                $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$amount,$cust['name'],$remark,$_url);
                 pfb::addLog('发送余额变动通知'.json_encode($_r));
             }else{
                 pfb::addLog('预订订单到账失败');
@@ -496,13 +498,12 @@ class pfb{
     }
 
     //发送余额变动通知
-    public static function sendBalanceChange($wx,$wei,$openId,&$user,$amount,$account,$remark=''){
+    public static function sendBalanceChange($wx,$wei,$openId,&$user,$amount,$account,$remark,$url='#'){
         if($amount==0)return array(
             "errcode"=>0,
             "errmsg"=>"金额为0，不进行推送"
         );
         $tem=$wei['template']['OPENTM207664902'];
-        $url='#';
         $date=date("Y-m-d H:i:s");
         $user['balance']=$user['balance']+$amount;
         $type='入账';
@@ -585,7 +586,9 @@ class pfb{
         if(!isset($flag)||!$flag){//默认发送给支付人
             pfb::addLog('commissionSuccess:发送余额变动');
             $emp_openId=pfb::getOpenId($e_user);
-            $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$commission,$payName,$remark);//发送给商户
+            //点击进入企业账户页面
+            $_url='http://'.api_v2::$domain['wx'].'/autogps/src/moblie/home.html?loginLocation=financial_manage';
+            $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$commission,$payName,$remark,$_url);//发送给商户
             pfb::addLog('佣金支出'.json_encode($_r));
         }
 
@@ -602,13 +605,18 @@ class pfb{
         $pay=$API->start($b,$opt);
         pfb::addLog('更新预订信息'.json_encode($pay));
 
+        //点击进入个人钱包
+        $_url='http://'.api_v2::$domain['wx'].'/autogps/src/moblie/home.html?loginLocation=myAccount%2Fwallet';
         if($e_user['userType']==7){//是车主的话，获取服务号进行推送
             $wei=pfb::getWeixin($sid,0);
             if(!$wei)
                 return;
             $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
+            $_url='http://'.api_v2::$domain['user'].'/wo365_user/src/moblie/home.html?loginLocation=myAccount%2Fwallet';
         }
-        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,$name,'订单'.$booking_id.'佣金');//发送给推荐人
+
+        $remark='订单'.$booking_id.'佣金';
+        $_r=pfb::sendBalanceChange($wx,$wei,$emp_openId,$e_user,$commission,$name,$remark,$_url);//发送给推荐人
         pfb::addLog('佣金到帐'.json_encode($_r));
     }
 
