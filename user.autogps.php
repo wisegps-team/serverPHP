@@ -168,7 +168,7 @@ class wechatCallbackapiTest
         if(!$booking['data'])
             return '无预订信息';
         if($booking['data']['type']==0&&$booking['data']['openId']!=$open_id){//为自己预订且不是车主
-            pfb::addLog('感谢关注open_id'.$open_id.'---bookingOpenId'.$booking['data']['openId']);
+            pfb::addLog('微信appid'.$_GET['wxAppKey'].'---感谢关注open_id：'.$open_id.'---bookingOpenId：'.$booking['data']['openId']);
             return '感谢关注';
         }
         $booking=$booking['data'];
