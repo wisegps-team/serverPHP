@@ -185,14 +185,13 @@ class wechatCallbackapiTest
             $pay=number_format($booking['payMoney'],2);
         else
             $pay='0.00';
-
-        $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fwo365_user%2Forder.html&bookingId='.$booking['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
-        // $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking_install.html&intent=logout&needOpenId=true&bookingId='.$booking['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
+            
+        //loginLocation参数需经过两次编码
+        $in_url='http://'.api_v2::$domain['user'].'/?loginLocation=%252Fwo365_user%252Forder.html%253FbookingId%253D'.$booking['objectId'].'&wx_app_id='.$_GET['wxAppKey'];
 
         $remark='点击详情选择授权安装网点';
         if($booking['type']==1&&$booking['openId']==$open_id){//为他人预订
             $remark='点击详情并按提示发送给好友';
-            // $in_url='http://'.api_v2::$domain['user'].'/?location=%2Fautogps%2Fbooking.html&intent=logout&bookingId='.$booking['objectId'].'&wxAppKey='.$_GET['wxAppKey'].'&name='.urlencode($booking['name']).'&userName='.urlencode($booking['userName']);
         }
 
         $date=date("Y-m-d H:i",strtotime($booking['createdAt']));
@@ -213,7 +212,8 @@ class wechatCallbackapiTest
         $longTimeTask[count($longTimeTask)]=function() use($wei,$title,$date,$p,$pay,$user,$booking,$in_url){
             global $opt,$API;
             $booking_id=$booking['objectId'];
-            $url='http://'.api_v2::$domain['wx'].'/?location=%2Fautogps%2Forder.html&bookingId='.$booking['objectId'].'&wx_app_id=';
+            //loginLocation参数需经过两次编码
+            $url='http://'.api_v2::$domain['wx'].'/?loginLocation=%252Fautogps%252Forder.html%253FbookingId%253D'.$booking['objectId'].'&wx_app_id=';
 
             $r=$API->start(array(
                 'method'=>'wicare.booking.update',
