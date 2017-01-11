@@ -173,8 +173,17 @@ class wechatCallbackapiTest
         }
         $booking=$booking['data'];
         $product=$booking['product'];
+        $pro=$API->start(array(//获取产品品牌
+            'method'=>'wicare.product.get',
+            'objectId'=>$product['id'],
+            'fields'=>'objectId,name,company,uid,brand,brandId'
+        ),$opt);
+        if($pro['data'])
+            $product['brand']=$pro['data']['brand'];
+        else
+            $product['brand']='';
 
-        $activity=$API->start(array(//获取活动信息
+        $activity=$API->start(array(//校验是否有这个活动
             'method'=>'wicare.activity.get',
             'objectId'=>$booking['activityId'],
             'fields'=>'name,price,installationFee,deposit,product'
@@ -191,12 +200,12 @@ class wechatCallbackapiTest
 
         $remark='点击详情选择授权安装网点';
         if($booking['type']==1&&$booking['openId']==$open_id){//为他人预订
-            $remark='点击详情并按提示发送给好友';
+            $remark='点击详情按提示将预订信息发送给车主选择安装网点';
         }
 
         $date=date("Y-m-d H:i",strtotime($booking['createdAt']));
         $user=$booking['userName'].'/'.$booking['userMobile'];
-        $p=$activity['data']['product'].'/￥'.number_format($product['price'],2);
+        $p=$product['brand'].$product['name'];
         $title='订单ID：'.$booking['objectId'];
         $_spare='订单ID：'.$booking['objectId'].'
 预订时间：'.$date.'
@@ -261,14 +270,14 @@ class wechatCallbackapiTest
             }
             pfb::addLog('获取销售人员openId：'.$open_id);
             if(!$open_id)return false;
-            $remark='车主信息：'.$booking['name'].'/'.$booking['mobile'];
-            sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url);
+            $remark='预订人：'.$booking['name'].'/'.$booking['mobile'];
+            $res=sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url);
+            pfb::addLog('给营销人员推送返回：'.json_encode($res));
         };
         if(!$wei){
             return $_spare;
         }
-        sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url);
-        $res=json_decode($res,true);
+        $res=sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in_url);
         if($res['errcode'])//如果出错则推送文字
             return $_spare;
         else
@@ -554,5 +563,6 @@ function sendBookingSuccess($wei,$open_id,$title,$date,$p,$pay,$user,$remark,$in
             "color": "#173177"
         }
     }',$in_url);
+    return json_decode($res,true);
 }
 ?>
