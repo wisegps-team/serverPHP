@@ -153,7 +153,7 @@ class wechatCallbackapiTest
                 return $this->booking($scene,$open_id);
                 break;
             default:
-                return '功能编号未设置'.$d.$scene;
+                return '感谢扫码关注';
         }
     }
 
