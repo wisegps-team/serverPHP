@@ -331,7 +331,8 @@ class wechatCallbackapiTest
             $_GET['wxAppKey']
             .'&did='.$did   //设备imei
             .'&openid='.$open_id    //扫码人openId
-            .'&installId='.$device['uid'];//设备拥有者，就是安装网点
+            .'&installId='.$device['uid']//设备拥有者，就是安装网点
+            .'&modelId='.$device['modelId'];//产品型号id
         if($user['access_token']){
             $link.='&token='.$user['access_token'].'&uid='.$user['uid'];  //扫码人的user id，如果有账号的话
         }

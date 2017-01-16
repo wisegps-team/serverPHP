@@ -46,7 +46,7 @@ switch ($_GET["method"]){
 	case "addAndBind"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
 		addAndBindCar();
 		break;
-	case "setMenu"://校验did，添加车辆绑定设备，增加出入库记录，如果有预订，支付预付款和佣金
+	case "setMenu"://设置车主公众号自定义菜单
 		setMenu();
 		break;
 	case "getBrand"://根据产品id获取产品品牌，主要在booking.js预订时使用，展示产品品牌
@@ -57,6 +57,9 @@ switch ($_GET["method"]){
 		break;
 	case "bindOpenId"://绑定微信openid
 		bindOpenId();
+		break;
+	case "getDevice"://根据did获取设备基本信息，主要在注册时筛选预订使用
+		getDevice();
 		break;
 	default:
 		echoExit(0x9004,'INVALID_METHOD');
@@ -387,6 +390,16 @@ function bindOpenId(){
 		$r['status_code']=36872;
 		echo json_encode($r);
 	}
+}
+
+function getDevice(){
+	global $opt,$API;
+	$device=$API->start(array(
+		'method'=>'wicare._iotDevice.get',
+		'did'=>$_GET['did'],
+		'fields'=>'objectId,did,uid,model,modelId,binded,bindDate,serverId'
+	),$opt);
+	echo json_encode($device);
 }
 
 
