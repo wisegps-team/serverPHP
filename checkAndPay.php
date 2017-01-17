@@ -139,7 +139,7 @@ function checkAndPay($booking,$cid,$device,$payAll){
             if($pay['status_code']==8196){//余额不足，微信推送
                 $appData=WX::payAppData();
                 $tem=$wei['template']['OPENTM406963151'];
-                $_url='http://'.api_v2::$domain['user'].'/commission.php?bookingId='.$booking_id.'&cid='.$cid.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark).'&uid='.$pay_user['objectId'].'&to_uid='.$e_user['objectId'];
+                $_url='http://'.api_v2::$domain['user'].'/commission.php?bookingId='.$booking_id.'&cid='.$cid.'&sid='.$sid.'&title='.rawurlencode($emp['name'].'的佣金').'&amount='.$commission.'&remark='.rawurlencode($remark).'&uid='.$pay_user['objectId'].'&to_uid='.$e_user['objectId'];
                 $url="https://open.weixin.qq.com/connect/oauth2/authorize?appid=".$appData['wxAppKey']."&redirect_uri=".rawurlencode($_url)."&response_type=code&scope=snsapi_base&state=state#wechat_redirect";
                 pfb::addLog('$cust_openId:'.$cust_openId);
 	            $_res=$wx->sendWeixin($cust_openId,$tem,'
@@ -200,7 +200,7 @@ function addAndBind($uid,$vehicleName,$device,$open_id,$phone,$name,$booking,$ca
             'deviceType'=>$device['model']
         ),$opt);
         if($car['status_code']){
-            return '1+'.$car['status_code'];
+            return '1:'.$car['status_code'];
         }
         $carId=$car['objectId'];
     }
@@ -507,7 +507,12 @@ class pfb{
         $date=date("Y-m-d H:i:s");
         $user['balance']=$user['balance']+$amount;
         $type='入账';
-        if($amount<0)$type='支付';
+        $color='#173177';
+        if($amount<0){
+            $amount=0-$amount;
+            $type='支付';
+            $color='#990000';            
+        }
 
         return $wx->sendWeixin($openId,$tem,'
         {
@@ -525,7 +530,7 @@ class pfb{
             },
             "keyword3": {
                 "value": "'.number_format($amount,2).'",
-                "color": "#173177"
+                "color": "'.$color.'"
             },
             "remark": {
                 "value": "'.$remark.'",
@@ -546,7 +551,7 @@ class pfb{
 
         $date=date("Y-m-d H:i");
         $user=$booking['userName'].'/'.$booking['userMobile'];
-        $remark='订单ID：'.$booking['objectId'];
+        $remark='订单'.$booking['objectId'].'注册成功！';
         return $res=$wx->sendWeixin($openId,$tem,'
         {
             "first": {
@@ -558,7 +563,7 @@ class pfb{
                 "color": "#173177"
             },
             "keyword2": {
-                "value": "'.$device['model'].'",
+                "value": "'.$device['brand'].' '.$device['model'].'",
                 "color": "#173177"
             },
             "keyword3": {
@@ -588,7 +593,8 @@ class pfb{
             $emp_openId=pfb::getOpenId($e_user);
             //点击进入企业账户页面
             $_url='http://'.api_v2::$domain['wx'].'/autogps/src/moblie/home.html?loginLocation=financial_manage';
-            $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$commission,$payName,$remark,$_url);//发送给商户
+            $_comm=0-$commission;
+            $_r=pfb::sendBalanceChange($wx,$wei,$cust_openId,$pay_user,$_comm,$payName,$remark,$_url);//发送给商户
             pfb::addLog('佣金支出'.json_encode($_r));
         }
 

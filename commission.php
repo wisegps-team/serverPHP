@@ -25,7 +25,22 @@ function https_request($url){
 
 //输出错误信息并退出脚本
 function echoExit($str){
-	echo '<h1 style="text-align: center">'.$str.'</h1>';
+	echo '<!DOCTYPE html>
+			<html>
+				<head>
+					<meta charset="utf-8">
+					<meta http-equiv="X-UA-Compatible" content="IE=edge">
+					<meta name="viewport" content="width=device-width, initial-scale=1">
+					<meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+					<meta name="apple-mobile-web-app-capable" content="yes">
+					<title>'.$str.'</title>
+					<style>
+					</style>
+				</head>
+				<body>
+					<h1 style="text-align: center">'.$str.'</h1>
+				</body>
+			</html>';
 	exit;
 }
 
@@ -86,8 +101,9 @@ if(isset($_POST['oid'])){//支付成功之后
         echoExit('支付成功，但oid不正确');
     }     
     $cid=$_SESSION['cid'];
+    $sid=$_SESSION['sid'];
     //获取配置的营销号
-    $wei=pfb::getWeixin($cid);
+    $wei=pfb::getWeixin($sid);
     if(!$wei){
         echoExit('支付成功，但营销号未正确配置，无法推送余额信息');
     }        
@@ -106,7 +122,7 @@ if(isset($_POST['oid'])){//支付成功之后
     $e_user=pfb::getUser($emp['uid']);
     $remark=$_SESSION['remark'];
 
-    pfb::commissionSuccess($wx,$wei,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$cust['name'],$emp['name'],true);
+    pfb::commissionSuccess($wx,$wei,$cust_openId,$pay_user,$e_user,$_SESSION['commission'],$remark,$bookingId,$sid,$cust['name'],$emp['name'],true);
     echoExit('支付成功，请关闭本页面');
 }else if(isset($_GET['code'])){
     // //根据域名获取公众号信息
@@ -153,6 +169,7 @@ if(isset($_POST['oid'])){//支付成功之后
     $_SESSION['commission']=$_GET['amount'];//佣金
     $_SESSION['bookingId']=$_GET['bookingId'];//预订id
     $_SESSION['cid']=$_GET['cid'];//公司id
+    $_SESSION['sid']=$_GET['sid'];//设备的serverId
     $_SESSION['remark']=$_GET['remark'];//备注
     
     

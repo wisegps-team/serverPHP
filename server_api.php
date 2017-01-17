@@ -282,6 +282,7 @@ function addAndBindCar(){
 	$device=addAndBind($uid,$carNum,$device,$open_id,$phone,$name,$booking,$carId);
 	if(!is_array($device)){
 		echo '{"status_code":"'.$device.'"}';
+		exit;
 	}
 
 	//添加出入库记录

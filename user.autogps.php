@@ -205,7 +205,7 @@ class wechatCallbackapiTest
 
         $date=date("Y-m-d H:i",strtotime($booking['createdAt']));
         $user=$booking['userName'].'/'.$booking['userMobile'];
-        $p=$product['brand'].$product['name'];
+        $p=$product['brand'].' '.$product['name'];
         $title='订单ID：'.$booking['objectId'];
         $_spare='订单ID：'.$booking['objectId'].'
 预订时间：'.$date.'
@@ -223,7 +223,9 @@ class wechatCallbackapiTest
             $booking_id=$booking['objectId'];
             //loginLocation参数需经过两次编码
             $url='http://'.api_v2::$domain['wx'].'/?loginLocation=%252Fautogps%252Forder.html%253FbookingId%253D'.$booking['objectId'].'&wx_app_id=';
-
+            if($booking['carType']['qrStatus']==1){
+                return;
+            }
             $r=$API->start(array(
                 'method'=>'wicare.booking.update',
                 '_objectId'=>$booking_id,
@@ -349,6 +351,13 @@ class wechatCallbackapiTest
                 }
             }
         }
+
+        $pro=$API->start(array(//获取产品品牌
+            'method'=>'wicare.product.get',
+            'objectId'=>$device['modelId'],
+            'fields'=>'objectId,name,company,uid,brand,brandId'
+        ),$opt);
+        $product=$pro['data'];
         
         $wei=pfb::getWeixin($_GET['wxAppKey'],-1);
         if(!$wei){
@@ -367,7 +376,7 @@ class wechatCallbackapiTest
                 "color": "#173177"
             },
             "keyword2": {
-                "value": "'.$device['model'].'",
+                "value": "'.$product['brand'].' '.$device['model'].'",
                 "color": "#173177"
             },
             "keyword3": {
