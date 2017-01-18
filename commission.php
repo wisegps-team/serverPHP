@@ -105,6 +105,7 @@ if(isset($_POST['oid'])){//支付成功之后
     //获取配置的营销号
     $wei=pfb::getWeixin($sid);
     if(!$wei){
+        pfb::addLog('营销号未正确配置,sid='.$sid.',getWeixin返回：'.json_encode($wei));
         echoExit('支付成功，但营销号未正确配置，无法推送余额信息');
     }        
     $wx=new WX($wei['wxAppKey'],$wei['wxAppSecret']);
