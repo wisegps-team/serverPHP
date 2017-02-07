@@ -257,7 +257,7 @@ class wechatCallbackapiTest
                 if($cust['data']['custTypeId']!=7){//不是车主
                     $wei=pfb::getWeixin($cust['data']['objectId']);
                     if(!$wei)return;
-                    $uid=$emp['data']['uid'];
+                    $uid=$cust['data']['uid'];
                     $in_url=$url.$wei['wxAppKey'];
                     $open_id=pfb::getOpenId($uid);
                 }else{//是车主的话
